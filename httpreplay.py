@@ -10,7 +10,9 @@ MASTER_SECRET_RE = [
 ]
 
 class TCPPacketStreamer(object):
-    """Yields TCP packets from a PCAP."""
+    """Iterates over a PCAP file and yields TCP packet streams with support
+    for out-of-order packets and all that. Finalizes with a None sentinal for
+    both client and server streams to indicate their end."""
 
     def __init__(self, path):
         self.pcap = dpkt.pcap.Reader(open(path, "rb"))
@@ -55,34 +57,33 @@ class TCPPacketStreamer(object):
             if not isinstance(ip.data, dpkt.tcp.TCP):
                 continue
 
-            if not ip.data.data:
+            is_rst = ip.data.flags & dpkt.tcp.TH_RST
+            is_fin = ip.data.flags & dpkt.tcp.TH_FIN
+            if not ip.data.data and not is_rst and not is_fin:
                 continue
 
             stream = self._stream(ip)
             if (True, stream) in self.streams:
-                yield self._queue_packet(True, stream, ip.data)
+                if is_rst:
+                    yield stream, True, None
+                    yield stream, False, None
+                elif is_fin:
+                    yield stream, True, None
+                else:
+                    yield self._queue_packet(True, stream, ip.data)
+
                 continue
 
             stream_rev = self._stream(ip, reverse=True)
             if (False, stream_rev) in self.streams:
-                yield self._queue_packet(False, stream_rev, ip.data)
-                continue
+                if is_rst:
+                    yield stream, True, None
+                    yield stream, False, None
+                elif is_fin:
+                    yield stream_rev, False, None
+                else:
+                    yield self._queue_packet(False, stream_rev, ip.data)
 
-            try:
-                record = dpkt.ssl.TLSRecord(ip.data.data)
-            except dpkt.NeedData:
-                continue
-
-            if dpkt.ssl.RECORD_TYPES.get(record.type) != \
-                    dpkt.ssl.TLSHandshake:
-                continue
-
-            try:
-                handshake = dpkt.ssl.TLSHandshake(record.data)
-            except dpkt.NeedData:
-                continue
-
-            if not isinstance(handshake.data, dpkt.ssl.TLSClientHello):
                 continue
 
             self.streams[True, stream] = ip.data.seq + len(ip.data.data)
@@ -90,8 +91,8 @@ class TCPPacketStreamer(object):
             yield stream, True, ip.data.data
 
 class TCPStream(object):
-    """Concatenates TCP packets and returns them either directly or as TLS
-    records."""
+    """Concatenates TCP streams into ask/response sequences and transparently
+    yields single TLS records if requested to do so."""
 
     def __init__(self, ((ipsrc, sport), (ipdst, dport)), tls=False):
         self.ipsrc = ipsrc
@@ -102,7 +103,7 @@ class TCPStream(object):
         self.packets = []
 
     def put_packet(self, send, packet):
-        if self.packets:
+        if self.packets and packet is not None:
             last_send, last_packet = self.packets[-1]
             if last_send == send:
                 self.packets[-1] = last_send, last_packet + packet
@@ -111,7 +112,7 @@ class TCPStream(object):
         self.packets.append((send, packet))
 
     def pop_packet(self, send=None):
-        send_packet, packet = self.packets[0]
+        send_packet, packet = self.packets.pop(0)
         if send is not None:
             assert send == send_packet
             return packet
@@ -119,15 +120,16 @@ class TCPStream(object):
             return send_packet, packet
 
     def pop_tls_record(self, send=None):
-        send_packet, packet = self.packets[0]
+        send_packet, packet = self.packets.pop(0)
         if send is not None:
             assert send == send_packet
 
+        if packet is None:
+            return send_packet, packet
+
         record = dpkt.ssl.TLSRecord(packet)
         if len(packet) > len(record):
-            self.packets[0] = send_packet, packet[len(record):]
-        else:
-            del self.packets[0]
+            self.packets.insert(0, (send_packet, packet[len(record):]))
 
         if send is None:
             return send_packet, record
@@ -140,6 +142,9 @@ class TCPStream(object):
                 send, record = self.pop_tls_record()
             else:
                 send, record = self.pop_packet()
+
+            if record is None:
+                continue
 
             yield send, record
 
@@ -259,7 +264,8 @@ if __name__ == "__main__":
             sockets[stream] = TCPStream(stream)
             socks.append(sockets[stream])
 
-        sockets[stream].put_packet(send, packet)
+        if packet is not None:
+            sockets[stream].put_packet(send, packet)
 
     for sock in socks:
         for x in TLSStream(sock):
