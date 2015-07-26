@@ -14,7 +14,8 @@ class TCPPacketStreamer(object):
 
     def __init__(self, path):
         self.pcap = dpkt.pcap.Reader(open(path, "rb"))
-        self.streams = set()
+        self.streams = {}
+        self.seq = {}
 
     def _stream(self, ip, reverse=False):
         ipsrc = socket.inet_ntoa(ip.src)
@@ -23,6 +24,26 @@ class TCPPacketStreamer(object):
             return (ipdst, ip.data.dport), (ipsrc, ip.data.sport)
         else:
             return (ipsrc, ip.data.sport), (ipdst, ip.data.dport)
+
+    def _queue_packet(self, send, stream, tcp):
+        chunks = []
+        uniqid = send, stream
+
+        # Incoming data also has to be registered.
+        if self.streams[uniqid] is None:
+            self.streams[uniqid] = tcp.seq
+
+        if tcp.seq == self.streams[uniqid]:
+            chunks.append(tcp.data)
+
+            self.streams[uniqid] += len(tcp.data)
+            while (uniqid, self.streams[uniqid]) in self.seq:
+                chunks.append(self.seq.pop((uniqid, self.streams[uniqid])))
+                self.streams[uniqid] += len(chunks[-1])
+        else:
+            self.seq[uniqid, tcp.seq] = tcp.data
+
+        return stream, send, "".join(chunks)
 
     def __iter__(self):
         for ts, packet in self.pcap:
@@ -38,13 +59,14 @@ class TCPPacketStreamer(object):
                 continue
 
             stream = self._stream(ip)
-            if stream in self.streams:
-                yield stream, True, ip.data.data
+            if (True, stream) in self.streams:
+                yield self._queue_packet(True, stream, ip.data)
                 continue
 
             stream_rev = self._stream(ip, reverse=True)
-            if stream_rev in self.streams:
-                yield stream_rev, False, ip.data.data
+            if (False, stream_rev) in self.streams:
+                yield self._queue_packet(False, stream_rev, ip.data)
+                continue
 
             try:
                 record = dpkt.ssl.TLSRecord(ip.data.data)
@@ -63,7 +85,8 @@ class TCPPacketStreamer(object):
             if not isinstance(handshake.data, dpkt.ssl.TLSClientHello):
                 continue
 
-            self.streams.add(stream)
+            self.streams[True, stream] = ip.data.seq + len(ip.data.data)
+            self.streams[False, stream] = None
             yield stream, True, ip.data.data
 
 class TCPStream(object):
