@@ -288,10 +288,10 @@ if __name__ == "__main__":
 
     for sock in socks:
         if sock.dport in (80, 8080):
-            for x in HttpStream(sock):
-                print repr(x)
-                print
+            for req, res in HttpStream(sock):
+                req = dpkt.http.Request(req)
+                print "http://%s%s" % (req.headers["host"], req.uri)
         elif sock.dport in (443, 4443):
-            for x in HttpStream(TLSStream(sock)):
-                print sock.sport, repr(x)
-                print
+            for req, res in HttpStream(TLSStream(sock)):
+                req = dpkt.http.Request(req)
+                print "https://%s%s" % (req.headers["host"], req.uri)
