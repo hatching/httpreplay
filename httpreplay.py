@@ -172,11 +172,11 @@ class TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
 
     def decrypt_server(self, record_type, buf):
         self._readState = self.server_cipher
-        return str(next(self._decryptRecord(record_type, buf)))
+        return str(next(self._decryptRecord(record_type, bytearray(buf))))
 
     def decrypt_client(self, record_type, buf):
         self._readState = self.client_cipher
-        return str(next(self._decryptRecord(record_type, buf)))
+        return str(next(self._decryptRecord(record_type, bytearray(buf))))
 
     def decrypt(self, send, record_type, buf):
         fn = self.decrypt_client if send else self.decrypt_server
