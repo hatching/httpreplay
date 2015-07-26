@@ -119,7 +119,7 @@ class TCPStream(object):
         else:
             return send_packet, packet
 
-    def pop_tls_record(self, send=None):
+    def pop_tls_record(self, send=None, complete=False):
         send_packet, packet = self.packets.pop(0)
         if send is not None:
             assert send == send_packet
@@ -127,9 +127,16 @@ class TCPStream(object):
         if packet is None:
             return send_packet, packet
 
-        record = dpkt.ssl.TLSRecord(packet)
-        if len(packet) > len(record):
-            self.packets.insert(0, (send_packet, packet[len(record):]))
+        if complete is False:
+            record = dpkt.ssl.TLSRecord(packet)
+            if len(packet) > len(record):
+                self.packets.insert(0, (send_packet, packet[len(record):]))
+        else:
+            records = []
+            while packet:
+                records.append(dpkt.ssl.TLSRecord(packet))
+                packet = packet[len(records[-1]):]
+            record = records
 
         if send is None:
             return send_packet, record
@@ -137,9 +144,12 @@ class TCPStream(object):
             return record
 
     def __iter__(self):
-        while self.packets:
+        # The stream is ended by a None sentinel. By forcing at least two
+        # packets in the queue before popping the next one off we ensure that
+        # the latest packet is fully reassembled.
+        while len(self.packets) > 1:
             if self.tls:
-                send, record = self.pop_tls_record()
+                send, record = self.pop_tls_record(complete=True)
             else:
                 send, record = self.pop_packet()
 
@@ -151,7 +161,7 @@ class TCPStream(object):
 class TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
     """Decrypts TLS streams into a TCPStream-like session."""
 
-    _tls_versions = {
+    tls_versions = {
         dpkt.ssl.SSL3_V: (3, 0),
         dpkt.ssl.TLS1_V: (3, 1),
         dpkt.ssl.TLS11_V: (3, 2),
@@ -167,7 +177,7 @@ class TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
     def init_cipher(self, tls_version, cipher_suite, master_secret,
                     client_random, server_random, cipher_implementations):
         self._client = True
-        self.version = self._tls_versions[tls_version]
+        self.version = self.tls_versions[tls_version]
 
         self._calcPendingStates(cipher_suite, master_secret, client_random,
                                 server_random, cipher_implementations)
@@ -187,7 +197,7 @@ class TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         fn = self.decrypt_client if send else self.decrypt_server
         return fn(record_type, buf)
 
-    def __iter__(self):
+    def negotiate(self):
         client_hello = self._parse_record(self.sock.pop_tls_record(True))
         server_hello = self._parse_record(self.sock.pop_tls_record(False))
         master_secret = MASTER_SECRETS[server_hello.data.session_id]
@@ -225,23 +235,33 @@ class TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
 
         # Stream the TLS stream as if it was a regular TCP stream.
         self.sock.tls = True
-        for send, record in self.sock:
-            packet = self._parse_record(record)
-
-            if send:
-                yield send, self.decrypt_client(record.type, packet)
-            else:
-                yield send, self.decrypt_server(record.type, packet)
-
-class HttpStream(object):
-    def __init__(self, pcapfile):
-        self.pcapfile = pcapfile
 
     def __iter__(self):
-        streams = {}
-        for stream, send, packet in TCPPacketStreamer(self.pcapfile):
-            if stream not in streams:
-                pass
+        # This is not as clean as it could be, but for now it'll have to do.
+        if not self.sock.tls:
+            self.negotiate()
+
+        for send, records in self.sock:
+            stream = []
+
+            for record in records:
+                packet = self._parse_record(record)
+                stream.append(self.decrypt(send, record.type, packet))
+
+            yield send, "".join(stream)
+
+class HttpStream(object):
+    def __init__(self, stream):
+        self.stream = stream
+
+    def __iter__(self):
+        while True:
+            # Is there a cleaner way to do this?
+            client_send, request = next(iter(self.stream))
+            server_send, response = next(iter(self.stream))
+            assert client_send is True and server_send is False
+
+            yield request, response
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -264,9 +284,14 @@ if __name__ == "__main__":
             sockets[stream] = TCPStream(stream)
             socks.append(sockets[stream])
 
-        if packet is not None:
-            sockets[stream].put_packet(send, packet)
+        sockets[stream].put_packet(send, packet)
 
     for sock in socks:
-        for x in TLSStream(sock):
-            print repr(x)
+        if sock.dport in (80, 8080):
+            for x in HttpStream(sock):
+                print repr(x)
+                print
+        elif sock.dport in (443, 4443):
+            for x in HttpStream(TLSStream(sock)):
+                print sock.sport, repr(x)
+                print
