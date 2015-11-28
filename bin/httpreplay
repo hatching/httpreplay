@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+# Copyright (C) 2015 Jurriaan Bremer <jbr@cuckoo.sh>
+# This file is part of HTTPReplay - http://jbremer.org/httpreplay/
+# See the file 'LICENSE' for copying permission.
+
+import argparse
+import logging
+
+import httpreplay.cobweb
+import httpreplay.reader
+import httpreplay.smegma
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("pcapfile", type=str, help="PCAP file")
+    args = parser.parse_args()
+
+    logging.basicConfig()
+
+    handlers = {
+        80: httpreplay.cobweb.HttpProtocol(),
+        # 443: httpreplay.smegma.TLSStream(httpreplay.cobweb.HttpProtocol()),
+    }
+
+    reader = httpreplay.reader.PcapReader(args.pcapfile)
+    reader.tcp = httpreplay.smegma.TCPPacketStreamer(reader, handlers)
+
+    for s, ts, sent, recv in reader.process():
+        print s, ts, sent.uri
