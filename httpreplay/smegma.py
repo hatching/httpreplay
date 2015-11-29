@@ -30,6 +30,7 @@ class TCPPacketStreamer(Protocol):
     def init(self, handlers):
         self.streams = {}
         self.handlers = handlers
+        self.spurious = {}
 
         # For each handler we follow it all the way to the end (so to support
         # nested protocol interpreters such as, e.g., HTTPS) and put our
@@ -79,10 +80,17 @@ class TCPPacketStreamer(Protocol):
         if sr in self.streams and tcp_flags(tcp) == "sa":
             s = self.streams[sr]
             if tcp.ack != s.cli + 1:
+                # Handle "TCP Spurious Retransmission" packets which in this
+                # case most-likely represent duplicate packets.
+                # https://blog.packet-foo.com/2013/06/spurious-retransmissions/
+                if (tcp.ack, tcp.seq) in self.spurious:
+                    return
+
                 raise UnknownTcpSequenceNumber(tcp)
             if tcp.data:
                 raise UnexpectedTcpData(tcp)
 
+            self.spurious[tcp.ack, tcp.seq] = None
             s.cli = tcp.ack
             s.srv = tcp.seq + 1
             return

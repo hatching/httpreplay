@@ -71,6 +71,31 @@ pcaps = [
             (('192.168.138.163', 48754, '24.253.145.21', 49220), 'TCPRetransmission'),
         ],
     },
+    {
+        "handlers": {
+            80: http_handler(),
+        },
+        "pcapfile": "pcaps/2015-10-08-Nuclear-EK-example-2-traffic.pcap",
+        "format": lambda s, ts, sent, recv: getattr(sent, "uri", None),
+        "output": [
+            "/",
+            "/wp-content/themes/mostashfa/hover/css/style_common.css",
+            "/wp-content/themes/mostashfa/js/animatescroll.js",
+            "/url?sa=l&rct=k&q=&esrc=y&source=web&cd=6&ved=aXFtVVktOQV0AQlBUSQ0JT1F&url=https%3A%2F%2F5584e38742.com&MhKWJ=399940b556&JMCQIUt=95578e0&ZhmZl=bVU1&1Q5U=eTG1ZX&5z9YSX0=dW1R&Fuj1T2=cFQ",
+            "/viewtopic?0cFYRYP=2b1af084f&Fg5Ot=aUE1BT0daBERSVU8KDUkFA&A3uQ=cSVU8HGwM&ZysTUyT=0a0f23070&CnhL8C=dDHQACGwcDAE8DAQEFAAIKAgABT1VeBg..&HK2yA=bk9QUlNVUltVVBt",
+            "/certainly?XcahV=eB&WOmmu=82d5a31898&TRH=cEBSQQFBwcBBA0G&5htVN5B=aU1xdVk9GXQRAUFVODQ1NAQEKSVdWVVdTXV&Wcy=bJQHVBUSQAfBQEcBgUfAQ&B3zj=dBgNOAklUfX&ZkxS=9e82ca&L6p=fjQ0kD",
+            "/wp-content/plugins/ultimate-gallery/ultimate.swf",
+            "/main.htm",
+            "/file.htm",
+            "/including?5EMZF=bU1FQW1RTG1ZXTwYcAwcfAAMcBwcCTwI&CH7Vl=57dfb5e&GffCcya=42b973&Vjrh8k=cGAQECAgsF&CPBXbg=aUV1uVV9TRl1NR1sDRFZXT1FV&PhfPwgY=dAAVNCws.",
+            "/amount?5funIuS=bV1JaUlQfUFVOABsHAR0BBRsD&MvLsp=884f265e&Nxjv3F=aU1xdVk9GXQRAUFVODQ1NBwJOV1JX&ENLUF=dFBwADDQIE&L22=cAQBOBAE&KU3=21c1d81d&WST12=eA08FSU9gVnFhZkkA",
+            "/viewtopic?8U9Z=0d31950a&DS7a2p=bXVJQHVBUSQAfBQEcB&2R7v=74b6fb&M5d4SvQ=aUV1uWUBOQV0AQlBUSVdWVVdT&KSsYgDJ=cgUfAQEBSQQFBwcBBA0GBgNODQ0.",
+            "/harsh02.exe",
+            "/harsh02.exe",
+            "/favicon.ico",
+            None,
+        ],
+    },
 ]
 
 def _pcap_2014_12_13(sent, recv):
