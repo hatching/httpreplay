@@ -91,10 +91,10 @@ class TCPPacketStreamer(Protocol):
         if sn in self.streams and not self.streams[sn].conn:
             s = self.streams[sn]
 
-            # Retransmission of a TCP/IP connection. Or in other words, most
-            # likely a dead host.
+            # Retransmission of a TCP/IP connection. Or in other words, this
+            # could be a dead host.
             if tcp_flags(tcp) == "s" and not s.srv:
-                self.parent.handle(sn, ts, TCPDeadHost(), None)
+                self.parent.handle(sn, ts, TCPRetransmission(), None)
                 return
 
             if tcp_flags(tcp) != "a":
@@ -121,7 +121,7 @@ class TCPPacketStreamer(Protocol):
         for stream in self.streams.values():
             stream.finish()
 
-class TCPDeadHost(Protocol):
+class TCPRetransmission(Protocol):
     """Indicates a dead host, one that we were not able to connect to during
     the time that this PCAP was alive and kicking."""
 
