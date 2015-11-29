@@ -9,6 +9,9 @@ import logging
 import httpreplay.cobweb
 import httpreplay.reader
 import httpreplay.smegma
+import httpreplay.test
+
+from httpreplay.cut import http_handler
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -18,9 +21,12 @@ if __name__ == "__main__":
     logging.basicConfig()
 
     handlers = {
-        80: httpreplay.cobweb.HttpProtocol(),
+        80: http_handler(),
         # 443: httpreplay.smegma.TLSStream(httpreplay.cobweb.HttpProtocol()),
     }
+
+    if args.pcapfile == "test":
+        httpreplay.test.test_suite()
 
     reader = httpreplay.reader.PcapReader(args.pcapfile)
     reader.tcp = httpreplay.smegma.TCPPacketStreamer(reader, handlers)

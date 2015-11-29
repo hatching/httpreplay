@@ -20,7 +20,6 @@ class HttpProtocol(Protocol):
     """Interprets the TCP or TLS stream as HTTP request and response."""
 
     def handle(self, s, ts, sent, recv):
-        # print sent.__class__, recv.__class__
         req = dpkt.http.Request(sent)
         res = dpkt.http.Response(recv)
 
