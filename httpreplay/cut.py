@@ -4,10 +4,15 @@
 
 import httpreplay.cobweb
 import httpreplay.reader
+import httpreplay.shoddy
 import httpreplay.smegma
 
 def readpcap(pcap_file, tlsmaster):
     pass
+
+def dummy_handler():
+    """Dummy Protocol handler that forwards packets to /dev/null."""
+    return httpreplay.shoddy.Protocol()
 
 def http_handler():
     return httpreplay.cobweb.HttpProtocol()

@@ -6,7 +6,7 @@ import logging
 
 import httpreplay.reader
 
-from httpreplay.cut import http_handler
+from httpreplay.cut import dummy_handler, http_handler
 
 log = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ pcaps = [
             80: http_handler(),
         },
         "pcapfile": "pcaps/test.pcap",
+        "description": "Tests TCP reassembly and basic HTTP extraction",
         "format": lambda s, ts, sent, recv: (ts, sent.uri, len(recv.body)),
         "output": [
             (1278472581.577512, "/sd/facebook_icon.png", 3462),
@@ -33,6 +34,7 @@ pcaps = [
             80: http_handler(),
         },
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
+        "description": "Extracts HTTP requests which have no response",
         "format": lambda s, ts, sent, recv: (sent.method, sent.uri, recv),
         "output": [
             ("POST", "/cmd.php", None),
@@ -44,6 +46,7 @@ pcaps = [
             80: http_handler(),
         },
         "pcapfile": "pcaps/2014-12-13-download.pcap",
+        "description": "Extracts HTTP response cut off during transmission",
         "format": lambda s, ts, sent, recv: _pcap_2014_12_13(sent, recv),
         "output": [
             ("/zp/zp-core/zp-extensions/tiny_mce/plugins/ajaxfilemanager/inc/main.php", 451729, 35040),
@@ -52,8 +55,10 @@ pcaps = [
     {
         "handlers": {
             80: http_handler(),
+            48754: dummy_handler(),
         },
         "pcapfile": "pcaps/2015-01-02-post-infection.pcap",
+        "description": "Handles TCP Retransmission logic",
         "format": lambda s, ts, sent, recv: (s, sent.__class__.__name__),
         "output": [
             (("192.168.138.163", 48754, "219.70.113.58", 49199), "TCPRetransmission"),
@@ -76,6 +81,7 @@ pcaps = [
             80: http_handler(),
         },
         "pcapfile": "pcaps/2015-10-08-Nuclear-EK-example-2-traffic.pcap",
+        "description": "Handles TCP Spurious Retransmission logic",
         "format": lambda s, ts, sent, recv: getattr(sent, "uri", None),
         "output": [
             "/",
