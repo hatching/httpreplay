@@ -2,6 +2,7 @@
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
+import dpkt
 import logging
 
 import httpreplay.reader
@@ -102,10 +103,48 @@ pcaps = [
             None,
         ],
     },
+    {
+        "handlers": {
+            80: http_handler(),
+            10771: dummy_handler(),
+            29391: dummy_handler(),
+        },
+        "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
+        "description": "Handle IGMP packets and HTTP on port 80",
+        "format": lambda s, ts, sent, recv: _pcap_2015_10_13(sent, recv),
+        "output": [
+            ("GET", "/"),
+            ("GET", "/view.js"),
+            ("POST", "/forum/db.php"),
+            ("GET", "/domain/195.22.28.194"),
+            "TCPRetransmission",
+        ],
+    },
+    {
+        "handlers": {
+            80: dummy_handler(),
+            "generic": http_handler(),
+        },
+        "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
+        "description": "Handle HTTP on non-default ports",
+        "format": lambda s, ts, sent, recv: _pcap_2015_10_13(sent, recv),
+        "output": [
+            ("GET", "/bound/shout-32517633"),
+            ("GET", "/august/Z250anJ5dGRq"),
+            ("GET", "/snap/dHdmYmVpdXZs"),
+            ("GET", "/full/a2hjY3hs"),
+            "TCPRetransmission",
+        ],
+    },
 ]
 
 def _pcap_2014_12_13(sent, recv):
     return sent.uri, int(recv.headers["content-length"]), len(recv.body)
+
+def _pcap_2015_10_13(sent, recv):
+    if isinstance(sent, dpkt.http.Request):
+        return sent.method, sent.uri
+    return sent.__class__.__name__
 
 def test_suite():
     errors = 0

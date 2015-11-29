@@ -51,6 +51,9 @@ class TCPPacketStreamer(Protocol):
         elif dstport in self.handlers:
             h = self.handlers[dstport].handle
             h((dstip, dstport, srcip, srcport), ts, recv, sent)
+        elif "generic" in self.handlers:
+            h = self.handlers["generic"].handle
+            h((dstip, dstport, srcip, srcport), ts, sent, recv)
         else:
             log.warning("Unhandled protocol port=%s/%s", srcport, dstport)
 

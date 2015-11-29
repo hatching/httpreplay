@@ -51,6 +51,8 @@ class PcapReader(object):
                     packet = packet.data
                 elif packet.p == dpkt.ip.IP_PROTO_UDP:
                     packet = packet.data
+                elif packet.p == dpkt.ip.IP_PROTO_IGMP:
+                    continue
                 else:
                     raise UnknownIpProtocol(packet)
             else:
