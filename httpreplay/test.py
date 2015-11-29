@@ -49,6 +49,16 @@ pcaps = [
             ("/zp/zp-core/zp-extensions/tiny_mce/plugins/ajaxfilemanager/inc/main.php", 451729, 35040),
         ],
     },
+    {
+        "handlers": {
+            80: http_handler(),
+        },
+        "pcapfile": "pcaps/2015-01-02-post-infection.pcap",
+        "format": lambda s, ts, sent, recv: (sent.__class__.__name__, recv),
+        "output": [
+            ("TCPDeadHost", None),
+        ],
+    },
 ]
 
 def _pcap_2014_12_13(sent, recv):
