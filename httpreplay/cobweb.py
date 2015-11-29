@@ -3,10 +3,30 @@
 # See the file 'LICENSE' for copying permission.
 
 import dpkt
+import logging
 import zlib
 
 from httpreplay.exceptions import UnknownHttpEncoding
 from httpreplay.shoddy import Protocol
+
+log = logging.getLogger(__name__)
+
+class _strip_content_length(dict):
+    """Keeps the Content-Length header but returns False when dpkt.http checks
+    whether we have the key in our dictionary."""
+
+    def __contains__(self, key):
+        if key == "content-length":
+            return False
+
+        return super(_strip_content_length, self).__contains__(key)
+
+def strip_content_length(f):
+    return _strip_content_length(_parse_headers(f))
+
+# We pretend as if the "Content-Length" header is not available.
+_parse_headers = dpkt.http.parse_headers
+dpkt.http.parse_headers = strip_content_length
 
 def decode_gzip(content):
     """Decompress HTTP gzip content, http://stackoverflow.com/a/2695575."""

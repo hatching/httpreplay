@@ -38,8 +38,21 @@ pcaps = [
             ("POST", "/cmd.php", None),
             ("GET", "/cmd.php", None),
         ],
-    }
+    },
+    {
+        "handlers": {
+            80: http_handler(),
+        },
+        "pcapfile": "pcaps/2014-12-13-download.pcap",
+        "format": lambda s, ts, sent, recv: _pcap_2014_12_13(sent, recv),
+        "output": [
+            ("/zp/zp-core/zp-extensions/tiny_mce/plugins/ajaxfilemanager/inc/main.php", 451729, 35040),
+        ],
+    },
 ]
+
+def _pcap_2014_12_13(sent, recv):
+    return sent.uri, int(recv.headers["content-length"]), len(recv.body)
 
 def test_suite():
     errors = 0
