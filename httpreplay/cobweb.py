@@ -20,14 +20,19 @@ class HttpProtocol(Protocol):
     """Interprets the TCP or TLS stream as HTTP request and response."""
 
     def handle(self, s, ts, sent, recv):
-        req = dpkt.http.Request(sent)
-        res = dpkt.http.Response(recv)
+        req = res = None
 
-        content_encoding = res.headers.get("content-encoding")
-        if content_encoding:
-            if content_encoding not in content_encodings:
-                raise UnknownHttpEncoding(content_encoding)
+        if sent:
+            req = dpkt.http.Request(sent)
 
-            res.body = content_encodings[content_encoding](res.body)
+        if recv:
+            res = dpkt.http.Response(recv)
+
+            content_encoding = res.headers.get("content-encoding")
+            if content_encoding:
+                if content_encoding not in content_encodings:
+                    raise UnknownHttpEncoding(content_encoding)
+
+                res.body = content_encodings[content_encoding](res.body)
 
         self.parent.handle(s, ts, req, res)

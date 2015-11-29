@@ -28,6 +28,17 @@ pcaps = [
             (1278472580.653563, '/', 113331),
         ],
     },
+    {
+        "handlers": {
+            80: http_handler(),
+        },
+        "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
+        "format": lambda s, ts, sent, recv: (sent.method, sent.uri, recv),
+        "output": [
+            ("POST", "/cmd.php", None),
+            ("GET", "/cmd.php", None),
+        ],
+    }
 ]
 
 def test_suite():
@@ -38,9 +49,10 @@ def test_suite():
             httpreplay.smegma.TCPPacketStreamer(reader, pcap["handlers"])
 
         for s, ts, sent, recv in reader.process():
-            if pcap["format"](s, ts, sent, recv) not in pcap["output"]:
-                log.critical("Error in unittest output for %s!",
-                             pcap["pcapfile"])
+            output = pcap["format"](s, ts, sent, recv)
+            if output not in pcap["output"]:
+                log.critical("Error in unittest output for %s: %s",
+                             pcap["pcapfile"], output)
                 errors += 1
 
     log.info("Found %d errors.", errors)
