@@ -129,10 +129,12 @@ pcaps = [
             80: http_handler(),
             10771: dummy_handler(),
             29391: dummy_handler(),
+            "deadhost": forward_handler(),
         },
         "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
         "description": "Handle IGMP packets and HTTP on port 80",
         "format": lambda s, ts, sent, recv: _pcap_2015_10_13(sent, recv),
+        "output_count": 22,
         "output": [
             ("GET", "/"),
             ("GET", "/view.js"),
@@ -149,12 +151,12 @@ pcaps = [
         "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
         "description": "Handle HTTP on non-default ports",
         "format": lambda s, ts, sent, recv: _pcap_2015_10_13(sent, recv),
+        "output_count": 4,
         "output": [
             ("GET", "/bound/shout-32517633"),
             ("GET", "/august/Z250anJ5dGRq"),
             ("GET", "/snap/dHdmYmVpdXZs"),
             ("GET", "/full/a2hjY3hs"),
-            "TCPRetransmission",
         ],
     },
 ]
