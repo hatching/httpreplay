@@ -217,7 +217,7 @@ class TCPStream(Protocol):
             dup = self.packets.pop(self.origins.pop((tcp.seq, tcp.ack)))
             log.warning(
                 "Found a retransmitted packet possibly with a different size "
-                "than the original packet: %s vs %s (timestamps %s vs %s)!",
+                "than the original packet: %s vs %s (timestamps %f vs %f)!",
                 len(dup), len(packet), dup.ts, packet.ts,
             )
 
@@ -288,7 +288,7 @@ class TCPStream(Protocol):
                 "were originally sent, then retransmitted with an extended "
                 "length, acknowledged before the retransmission, and then "
                 "sort of forgotten (timestamps %s).",
-                " ".join("%s" % packet.ts for packet in self.packets.values())
+                " ".join("%f" % packet.ts for packet in self.packets.values())
             )
 
 class TLSStream(Protocol):
