@@ -164,7 +164,7 @@ class TCPStream(Protocol):
 
         self.state = "conn"
 
-    def ack_packets(self, seq, ack):
+    def ack_packets(self, seq, ack, to_server):
         ret = Packet()
         while (seq, ack) in self.packets:
             buf = self.packets.pop((seq, ack))
@@ -172,21 +172,20 @@ class TCPStream(Protocol):
             ret.ts = buf.ts
             seq -= len(buf)
             self.origins.pop((seq, ack), None)
+
+        if not self.ts:
+            self.ts = ret.ts
+
+        if to_server:
+            self.sent += ret
+        else:
+            self.recv += ret
+
         return ret
 
     def state_conn(self, ts, tcp, to_server):
         if tcp.flags & dpkt.tcp.TH_ACK:
-            packet = self.ack_packets(tcp.ack, tcp.seq)
-
-            if not self.ts:
-                self.ts = packet.ts
-
-            # Note the reverse logic here; we're acknowledging that the other
-            # party has sent given packets to us.
-            if not to_server:
-                self.sent += packet
-            else:
-                self.recv += packet
+            self.ack_packets(tcp.ack, tcp.seq, not to_server)
 
         if tcp.flags & dpkt.tcp.TH_RST:
             self.state = "conn_closed"
@@ -229,12 +228,7 @@ class TCPStream(Protocol):
         self.state_conn(ts, tcp, to_server)
 
         # And let packets loose straight away.
-        packet = self.ack_packets(tcp.seq + len(tcp.data), tcp.ack)
-
-        if to_server:
-            self.sent += packet
-        else:
-            self.recv += packet
+        self.ack_packets(tcp.seq + len(tcp.data), tcp.ack, to_server)
 
     def state_conn_finish(self, ts, tcp, to_server):
         # Still acknowledging older packets.
