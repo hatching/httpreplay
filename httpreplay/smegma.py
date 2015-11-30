@@ -189,6 +189,7 @@ class TCPStream(Protocol):
 
         if tcp.flags & dpkt.tcp.TH_RST:
             self.state = "conn_closed"
+            self.ack_packets(tcp.ack, tcp.seq - 1, not to_server)
 
         tcp_seq = tcp.seq + len(tcp.data)
 
