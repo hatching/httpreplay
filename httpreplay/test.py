@@ -19,6 +19,7 @@ pcaps = [
         "pcapfile": "pcaps/test.pcap",
         "description": "Tests TCP reassembly and basic HTTP extraction",
         "format": lambda s, ts, sent, recv: (ts, sent.uri, len(recv.body)),
+        "output_count": 8,
         "output": [
             (1278472581.261381, "/sd/facebook_icon.png", 3462),
             (1278472581.261490, "/sd/twitter_icon.png", 0),
@@ -38,6 +39,7 @@ pcaps = [
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
         "description": "Extracts HTTP requests which have no response",
         "format": lambda s, ts, sent, recv: (sent.method, sent.uri, recv),
+        "output_count": 2,
         "output": [
             ("POST", "/cmd.php", None),
             ("GET", "/cmd.php", None),
@@ -51,6 +53,7 @@ pcaps = [
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
         "description": "Handle client disconnect and empty request",
         "format": lambda s, ts, sent, recv: (sent, recv),
+        "output_count": 2,
         "output": [
             ("", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
         ],
@@ -62,6 +65,7 @@ pcaps = [
         "pcapfile": "pcaps/2014-12-13-download.pcap",
         "description": "Extracts HTTP response cut off during transmission",
         "format": lambda s, ts, sent, recv: _pcap_2014_12_13(sent, recv),
+        "output_count": 1,
         "output": [
             ("/zp/zp-core/zp-extensions/tiny_mce/plugins/ajaxfilemanager/inc/main.php", 451729, 35040),
         ],
@@ -74,6 +78,7 @@ pcaps = [
         "pcapfile": "pcaps/2015-01-02-post-infection.pcap",
         "description": "Handles TCP Retransmission logic",
         "format": lambda s, ts, sent, recv: (s, sent.__class__.__name__),
+        "output_count": 24,
         "output": [
             (("192.168.138.163", 48754, "219.70.113.58", 49199), "TCPRetransmission"),
             (("192.168.138.163", 48754, "74.78.180.226", 49202), "TCPRetransmission"),
@@ -166,12 +171,20 @@ def test_suite():
         reader.tcp = \
             httpreplay.smegma.TCPPacketStreamer(reader, pcap["handlers"])
 
+        count = 0
         for s, ts, sent, recv in reader.process():
             output = pcap["format"](s, ts, sent, recv)
             if output not in pcap["output"]:
                 log.critical("Error in unittest output for %s: %s",
                              pcap["pcapfile"], output)
                 errors += 1
+            count += 1
+
+        if pcap.get("output_count") and count != pcap["output_count"]:
+            log.critical(
+                "Incorrect output count determined for %s: %s instead of %s",
+                pcap["pcapfile"], count, pcap["output_count"]
+            )
 
     log.info("Found %d errors.", errors)
     exit(1 if errors else 0)
