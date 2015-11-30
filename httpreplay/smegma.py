@@ -198,6 +198,16 @@ class TCPStream(Protocol):
         packet.ts = ts
 
         tcp_seq = tcp.seq + len(packet)
+
+        # If this is the final packet then the TCP sequence should be +1'd.
+        if tcp.flags & dpkt.tcp.TH_FIN:
+            self.state = "conn_finish"
+
+            if to_server:
+                self.cli = tcp_seq + 1
+            else:
+                self.srv = tcp_seq + 1
+
         if (tcp.seq, tcp.ack) in self.origins:
             dup = self.packets.pop(self.origins.pop((tcp.seq, tcp.ack)))
             log.warning(
@@ -221,12 +231,48 @@ class TCPStream(Protocol):
         else:
             self.recv += packet
 
+    def state_conn_finish(self, ts, tcp, to_server):
+        # Still acknowledging older packets.
+        if self.cli != tcp.ack and self.srv != tcp.ack:
+            self.state_conn(ts, tcp, to_server)
+            return
+
+        if tcp.flags & dpkt.tcp.TH_ACK:
+            if to_server:
+                if self.srv != tcp.ack:
+                    raise InvalidTcpPacketOrder(tcp)
+
+                # Process any final packets.
+                tcp.ack -= 1
+                self.state_conn(ts, tcp, to_server)
+
+                # Indicate the end of this connection.
+                self.srv = None
+
+            if not to_server:
+                if self.cli != tcp.ack:
+                    raise InvalidTcpPacketOrder(tcp)
+
+                # Process any final packets.
+                tcp.ack -= 1
+                self.state_conn(ts, tcp, to_server)
+
+                # Indicate the end of this connection.
+                self.cli = None
+
+        if tcp.flags & dpkt.tcp.TH_FIN:
+            if to_server:
+                self.cli = tcp.seq + 1
+            else:
+                self.srv = tcp.seq + 1
+
     states = {
         "init_syn": state_init_syn,
         "init_syn_ack": state_init_syn_ack,
         "init_ack": state_init_ack,
         "conn": state_conn,
         "conn_closed": state_conn_closed,
+        "conn_finish": state_conn_finish,
     }
 
     def process(self, ts, tcp, to_server):
