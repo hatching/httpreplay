@@ -187,15 +187,15 @@ class TCPStream(Protocol):
         packet = Packet(tcp.data)
         packet.ts = ts
 
-        tcp.seq += len(packet)
-        self.packets[tcp.seq, tcp.ack] = packet
+        tcp_seq = tcp.seq + len(packet)
+        self.packets[tcp_seq, tcp.ack] = packet
 
     def state_conn_closed(self, ts, tcp, to_server):
         # Enqueue this packet if any is provided.
         self.state_conn(ts, tcp, to_server)
 
         # And let packets loose straight away.
-        packet = self.ack_packets(tcp.seq, tcp.ack)
+        packet = self.ack_packets(tcp.seq + len(tcp.data), tcp.ack)
 
         if to_server:
             self.sent += packet
