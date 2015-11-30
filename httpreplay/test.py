@@ -74,34 +74,37 @@ pcaps = [
         "handlers": {
             80: http_handler(),
             48754: dummy_handler(),
+            "deadhost": forward_handler(),
         },
         "pcapfile": "pcaps/2015-01-02-post-infection.pcap",
         "description": "Handles TCP Retransmission logic",
         "format": lambda s, ts, sent, recv: (s, sent.__class__.__name__),
         "output_count": 24,
         "output": [
-            (("192.168.138.163", 48754, "219.70.113.58", 49199), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "74.78.180.226", 49202), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "68.80.249.239", 49204), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "190.244.193.78", 49205), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "173.28.84.203", 49207), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "73.199.51.213", 49208), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "66.81.47.199", 49209), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "186.9.145.31", 49211), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "68.193.144.105", 49213), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "99.235.167.54", 49214), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "126.119.135.45", 49215), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "219.70.113.58", 49218), "TCPRetransmission"),
-            (("192.168.138.163", 48754, "24.253.145.21", 49220), "TCPRetransmission"),
+            (("192.168.138.163", 49199, "219.70.113.58", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49202, "74.78.180.226", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49204, "68.80.249.239", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49205, "190.244.193.78", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49207, "173.28.84.203", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49208, "73.199.51.213", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49209, "66.81.47.199", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49211, "186.9.145.31", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49213, "68.193.144.105", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49214, "99.235.167.54", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49215, "126.119.135.45", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49218, "219.70.113.58", 48754), "TCPRetransmission"),
+            (("192.168.138.163", 49220, "24.253.145.21", 48754), "TCPRetransmission"),
         ],
     },
     {
         "handlers": {
             80: http_handler(),
+            "deadhost": forward_handler(),
         },
         "pcapfile": "pcaps/2015-10-08-Nuclear-EK-example-2-traffic.pcap",
         "description": "Handles TCP Spurious Retransmission logic",
-        "format": lambda s, ts, sent, recv: getattr(sent, "uri", None),
+        "format": lambda s, ts, sent, recv: _pcap_2015_10_08(sent, recv),
+        "output_count": 16,
         "output": [
             "/",
             "/wp-content/themes/mostashfa/hover/css/style_common.css",
@@ -118,7 +121,7 @@ pcaps = [
             "/harsh02.exe",
             "/harsh02.exe",
             "/favicon.ico",
-            None,
+            "TCPRetransmission",
         ],
     },
     {
@@ -162,6 +165,11 @@ def _pcap_2014_12_13(sent, recv):
 def _pcap_2015_10_13(sent, recv):
     if isinstance(sent, dpkt.http.Request):
         return sent.method, sent.uri
+    return sent.__class__.__name__
+
+def _pcap_2015_10_08(sent, recv):
+    if isinstance(sent, dpkt.http.Request):
+        return sent.uri
     return sent.__class__.__name__
 
 def test_suite():

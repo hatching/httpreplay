@@ -37,8 +37,15 @@ class TCPPacketStreamer(Protocol):
 
             handler.parent = self.parent
 
-    def handle(self, s, ts, sent, recv):
+    def handle(self, s, ts, sent, recv, special=None):
         srcip, srcport, dstip, dstport = s
+
+        if special:
+            if special not in self.handlers:
+                log.warning("Unhandled special protocol %s", special)
+            else:
+                self.handlers[special].handle(s, ts, sent, recv)
+            return
 
         if srcport in self.handlers:
             h = self.handlers[srcport].handle
@@ -123,7 +130,8 @@ class TCPStream(Protocol):
         # Retransmission of the initial SYN packet. Indicates that the server
         # is not responding and thus it might be a dead host.
         if to_server and tcp.flags == dpkt.tcp.TH_SYN:
-            self.parent.handle(self.s, ts, TCPRetransmission(), None)
+            self.parent.handle(self.s, ts, TCPRetransmission(),
+                               None, special="deadhost")
             return
 
         if to_server or tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
