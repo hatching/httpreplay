@@ -49,13 +49,11 @@ class TCPPacketStreamer(Protocol):
 
         if srcport in self.handlers:
             h = self.handlers[srcport].handle
-            h((srcip, srcport, dstip, dstport), ts, recv, sent)
+            h((dstip, dstport, srcip, srcport), ts, recv, sent)
         elif dstport in self.handlers:
-            h = self.handlers[dstport].handle
-            h((dstip, dstport, srcip, srcport), ts, sent, recv)
+            self.handlers[dstport].handle(s, ts, sent, recv)
         elif "generic" in self.handlers:
-            h = self.handlers["generic"].handle
-            h((dstip, dstport, srcip, srcport), ts, sent, recv)
+            self.handlers["generic"].handle(s, ts, sent, recv)
         else:
             log.warning("Unhandled protocol port=%s/%s", srcport, dstport)
 

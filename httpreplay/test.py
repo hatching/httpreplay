@@ -52,10 +52,10 @@ pcaps = [
         },
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
         "description": "Handle client disconnect and empty request",
-        "format": lambda s, ts, sent, recv: (sent, recv),
+        "format": lambda s, ts, sent, recv: (s[0], sent, recv),
         "output_count": 2,
         "output": [
-            ("", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
+            ("172.16.165.133", "", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
         ],
     },
     {
