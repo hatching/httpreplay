@@ -191,18 +191,7 @@ class TCPStream(Protocol):
         if tcp.flags & dpkt.tcp.TH_RST:
             self.state = "conn_closed"
 
-        if not tcp.data:
-            return
-
-        if to_server and self.recv:
-            self.parent.handle(self.s, self.ts, self.sent, self.recv)
-            self.sent = self.recv = ""
-            self.ts = None
-
-        packet = Packet(tcp.data)
-        packet.ts = ts
-
-        tcp_seq = tcp.seq + len(packet)
+        tcp_seq = tcp.seq + len(tcp.data)
 
         # If this is the final packet then the TCP sequence should be +1'd.
         if tcp.flags & dpkt.tcp.TH_FIN:
@@ -212,6 +201,17 @@ class TCPStream(Protocol):
                 self.cli = tcp_seq + 1
             else:
                 self.srv = tcp_seq + 1
+
+        if not tcp.data:
+            return
+
+        if tcp.data and to_server and self.recv:
+            self.parent.handle(self.s, self.ts, self.sent, self.recv)
+            self.sent = self.recv = ""
+            self.ts = None
+
+        packet = Packet(tcp.data)
+        packet.ts = ts
 
         if (tcp.seq, tcp.ack) in self.origins:
             dup = self.packets.pop(self.origins.pop((tcp.seq, tcp.ack)))
