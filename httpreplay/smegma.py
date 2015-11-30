@@ -95,6 +95,7 @@ class TCPStream(Protocol):
     def init(self, s):
         self.s = s
         self.packets = {}
+        self.origins = {}
         self.sent = ""
         self.recv = ""
         self.conn = False
@@ -157,6 +158,7 @@ class TCPStream(Protocol):
             ret = Packet(buf + ret)
             ret.ts = buf.ts
             seq -= len(buf)
+            self.origins.pop((seq, ack), None)
         return ret
 
     def state_conn(self, ts, tcp, to_server):
@@ -188,6 +190,15 @@ class TCPStream(Protocol):
         packet.ts = ts
 
         tcp_seq = tcp.seq + len(packet)
+        if (tcp.seq, tcp.ack) in self.origins:
+            dup = self.packets.pop(self.origins.pop((tcp.seq, tcp.ack)))
+            log.warning(
+                "Found a retransmitted packet possibly with a different size "
+                "than the original packet: %s vs %s (timestamps %s vs %s)!",
+                len(dup), len(packet), dup.ts, packet.ts,
+            )
+
+        self.origins[tcp.seq, tcp.ack] = tcp_seq, tcp.ack
         self.packets[tcp_seq, tcp.ack] = packet
 
     def state_conn_closed(self, ts, tcp, to_server):
@@ -216,6 +227,15 @@ class TCPStream(Protocol):
     def finish(self):
         if self.sent or self.recv:
             self.parent.handle(self.s, self.ts, self.sent, self.recv)
+
+        if self.packets:
+            log.warning(
+                "There are still packets in the pipeline. It is likely these "
+                "were originally sent, then retransmitted with an extended "
+                "length, acknowledged before the retransmission, and then "
+                "sort of forgotten (timestamps %s).",
+                " ".join("%s" % packet.ts for packet in self.packets.values())
+            )
 
 class TLSStream(Protocol):
     """Decrypts TLS streams into a TCPStream-like session."""
