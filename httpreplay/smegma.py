@@ -167,6 +167,9 @@ class TCPStream(Protocol):
             else:
                 self.recv += packet
 
+        if tcp.flags & dpkt.tcp.TH_RST:
+            self.state = "conn_closed"
+
         if not tcp.data:
             return
 
@@ -181,11 +184,24 @@ class TCPStream(Protocol):
         tcp.seq += len(packet)
         self.packets[tcp.seq, tcp.ack] = packet
 
+    def state_conn_closed(self, ts, tcp, to_server):
+        # Enqueue this packet if any is provided.
+        self.state_conn(ts, tcp, to_server)
+
+        # And let packets loose straight away.
+        packet = self.ack_packets(tcp.seq, tcp.ack)
+
+        if to_server:
+            self.sent += packet
+        else:
+            self.recv += packet
+
     states = {
         "init_syn": state_init_syn,
         "init_syn_ack": state_init_syn_ack,
         "init_ack": state_init_ack,
         "conn": state_conn,
+        "conn_closed": state_conn_closed,
     }
 
     def process(self, ts, tcp, to_server):
