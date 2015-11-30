@@ -20,9 +20,9 @@ pcaps = [
         "description": "Tests TCP reassembly and basic HTTP extraction",
         "format": lambda s, ts, sent, recv: (ts, sent.uri, len(recv.body)),
         "output": [
-            (1278472581.577512, "/sd/facebook_icon.png", 3462),
-            (1278472581.580736, "/sd/twitter_icon.png", 0),
-            (1278472581.584223, "/sd/print.css?T_2_5_0_300", 0),
+            (1278472581.261381, "/sd/facebook_icon.png", 3462),
+            (1278472581.261490, "/sd/twitter_icon.png", 0),
+            (1278472581.071695, "/sd/print.css?T_2_5_0_300", 0),
             (1278472581.580736, "/sd/logo2.png", 0),
             (1278472581.577512, "/sd/cs_i2_gradients.png?T_2_5_0_299", 0),
             (1278472581.584223, "/sd/cs_sic_controls_new.png?T_2_5_0_299", 0),
