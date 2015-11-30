@@ -56,3 +56,6 @@ class HttpProtocol(Protocol):
                 res.body = content_encodings[content_encoding](res.body)
 
         self.parent.handle(s, ts, req, res)
+
+class SmtpProtocol(Protocol):
+    """Interprets the SMTP protocol."""

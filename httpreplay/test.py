@@ -7,7 +7,7 @@ import logging
 
 import httpreplay.reader
 
-from httpreplay.cut import dummy_handler, http_handler
+from httpreplay.cut import dummy_handler, http_handler, forward_handler
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ pcaps = [
     },
     {
         "handlers": {
+            25: dummy_handler(),
             80: http_handler(),
         },
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
@@ -40,6 +41,18 @@ pcaps = [
         "output": [
             ("POST", "/cmd.php", None),
             ("GET", "/cmd.php", None),
+        ],
+    },
+    {
+        "handlers": {
+            25: forward_handler(),
+            80: dummy_handler(),
+        },
+        "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
+        "description": "Handle client disconnect and empty request",
+        "format": lambda s, ts, sent, recv: (sent, recv),
+        "output": [
+            ("", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
         ],
     },
     {
