@@ -119,7 +119,13 @@ class TCPStream(Protocol):
         self.state = "init_syn_ack"
 
     def state_init_syn_ack(self, ts, tcp, to_server):
-        if tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
+        # Retransmission of the initial SYN packet. Indicates that the server
+        # is not responding and thus it might be a dead host.
+        if to_server and tcp.flags == dpkt.tcp.TH_SYN:
+            self.parent.handle(self.s, ts, TCPRetransmission(), None)
+            return
+
+        if to_server or tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
             raise InvalidTcpPacketOrder(tcp)
 
         if tcp.data:
