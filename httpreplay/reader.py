@@ -59,6 +59,8 @@ class PcapReader(object):
             if isinstance(packet, dpkt.ethernet.Ethernet):
                 if isinstance(packet.data, dpkt.ip.IP):
                     packet = packet.data
+                elif isinstance(packet.data, dpkt.ip6.IP6):
+                    packet = packet.data
                 elif isinstance(packet.data, dpkt.arp.ARP):
                     packet = packet.data
                 else:
