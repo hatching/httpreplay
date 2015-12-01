@@ -170,6 +170,11 @@ class TCPStream(Protocol):
                                None, special="synflood")
             return
 
+        # The client has received a SYN ACK but is no longer interested in
+        # connecting to this service and thus quits through a RST.
+        if to_server and tcp.flags == dpkt.tcp.TH_RST:
+            return
+
         if tcp.flags != dpkt.tcp.TH_ACK:
             raise InvalidTcpPacketOrder(tcp)
 
