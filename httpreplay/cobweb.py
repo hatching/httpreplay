@@ -48,9 +48,14 @@ def decode_pack200_gzip(ts, content):
         "response but this has not been implemented yet (timestamp %f).", ts
     )
 
+def decode_none(ts, content):
+    """None encoding."""
+    return content
+
 content_encodings = {
     "gzip": decode_gzip,
     "pack200-gzip": decode_pack200_gzip,
+    "none": decode_none,
 }
 
 class HttpProtocol(Protocol):
