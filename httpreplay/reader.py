@@ -3,10 +3,13 @@
 # See the file 'LICENSE' for copying permission.
 
 import dpkt
+import logging
 
 from httpreplay.exceptions import (
     UnknownDatalink, UnknownEthernetProtocol, UnknownIpProtocol,
 )
+
+log = logging.getLogger(__name__)
 
 class PcapReader(object):
     """Iterates over a PCAP file and yields all interesting events after
@@ -14,10 +17,16 @@ class PcapReader(object):
     provided by the user."""
 
     def __init__(self, filepath):
-        self.pcap = dpkt.pcap.Reader(open(filepath, "rb"))
         self.tcp = None
         self.udp = None
         self.values = []
+
+        try:
+            self.pcap = dpkt.pcap.Reader(open(filepath, "rb"))
+        except ValueError as e:
+            if e.message == "invalid tcpdump header":
+                log.critical("Currently we don't support PCAP-NG files")
+            self.pcap = None
 
     def set_tcp_handler(self, tcp):
         self.tcp = tcp
@@ -26,6 +35,9 @@ class PcapReader(object):
         self.udp = udp
 
     def process(self):
+        if not self.pcap:
+            return
+
         for ts, packet in self.pcap:
             if isinstance(packet, str):
                 if self.pcap.datalink() == dpkt.pcap.DLT_EN10MB:
