@@ -114,6 +114,14 @@ class TCPStream(Protocol):
         self.state = "init_syn"
 
     def state_init_syn(self, ts, tcp, to_server):
+        # When no service is listening on the other end a server may send RST
+        # packets back after which the state will be reverted to "init_syn".
+        # And thus we have to handle any additional RSTs here as well. (Note
+        # that we don't really change the state here, so RSTs from the
+        # opposite side will also end up here).
+        if tcp.flags & dpkt.tcp.TH_RST:
+            return
+
         if tcp.flags != dpkt.tcp.TH_SYN:
             raise InvalidTcpPacketOrder(tcp)
 
@@ -206,6 +214,11 @@ class TCPStream(Protocol):
         if tcp.flags == (dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK) and tcp.data:
             self.state = "conn"
             self.state_conn(ts, tcp, to_server)
+            return
+
+        # You know, let's send a FIN packet.
+        if to_server and tcp.flags & dpkt.tcp.TH_FIN:
+            self.state = "conn_finish"
             return
 
         if tcp.flags != dpkt.tcp.TH_ACK:
