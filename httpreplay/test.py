@@ -3,6 +3,7 @@
 # See the file 'LICENSE' for copying permission.
 
 import dpkt
+import hashlib
 import logging
 
 import httpreplay.reader
@@ -159,6 +160,63 @@ pcaps = [
             ("GET", "/full/a2hjY3hs"),
         ],
     },
+    {
+        "handlers": {
+            80: http_handler(),
+            443: dummy_handler(),
+        },
+        "pcapfile": "pcaps/2015-10-12-Angler-EK-sends-Bedep-traffic.pcap",
+        "description": "Extracts HTTP requests which are not acknowledged",
+        "format": lambda s, ts, sent, recv: _pcap_2015_10_12(sent, recv),
+        "output_count": 46,
+        "output": """
+            719acc7111036d05908a2bbc2edb59cb
+            f9a8489b5110b8b06a8e97453257075d
+            63afa4cf1601f01c4751039f8bbfdab4
+            a7b807ebdb3843e2a3db757b5785792e
+            c3bef09a66c24455685e794e9b08b459
+            e59d25e237e5a3f3a6a06bd3faba7165
+            27eeac51fc7eb06a22372c0bb3e85950
+            0d621a81d3edbf9d58c76b01c37ed48b
+            1520227cc1354cb144d30a50779ab95b
+            a6298fa74bc8e61f94859dc90757c839
+            28f06d78a5568dc4c2c9149682b67fa8
+            cbb2bbdd3458221e9b51a20763f751c0
+            d41d8cd98f00b204e9800998ecf8427e
+            8a7f9fdc9b25a4b96b1da117f5b9d610
+            eed8ec65a6dd9b05eed6d4a02e1439e4
+            7008e1e1572f66b0fd30742e6ec4bb0f
+            2eb071fbf1b8252932302e0946fad386
+            2615820e5e0921ef0539f8651bf310a0
+            e4407e614445327e4edb836494cc4ef0
+            2098dedf3165609e56de26b8b0dc9661
+            3efe4a011bae1c5315f20408a7a9491b
+            9220f37dceb71a516e01c5a9d2e8366d
+            d41d8cd98f00b204e9800998ecf8427e
+            6593f3e7d45aca357b22be501d50ff01
+            89205cebf4c75c8e70d896e3803c3fb8
+            0f3427e4788f146600121d1e64b7b00d
+            b920cf93d2b296f3ec0a6605be86ed36
+            2c9e9b8a0e386e8db34827697160ec04
+            e8a01c0c54b8b8e24f1b2810dc395ab3
+            5f473a890d750f1147dc0c7cc4668481
+            1d260bbdbdf8ae67145134958e5fd864
+            1d67074ab1e6d3589da716a32fff6002
+            3191b37145f3c1411ce1b5f9a1a07ab9
+            cd9a2f577b63f7d9fd8d2bedcdd54bcd
+            4971de24dd429af31e0359fbc5ca1460
+            0067b30547ff79e4417356eb02e46032
+            75f453a23ee7e801ca3ae66536f8fd5c
+            a95fa6ffd78ab2a44ace57fa183b9d1f
+            f3856d13d9d3d951d2e1856661345cf5
+            65a65267a9d45cfd797bb4ade7534ca7
+            72fd1899fdcd91e44c6c046775795d4d
+            9bce0089598c20112cba73f37983da3e
+            4260a4cd810990652fa22fad4f0e290f
+            3bd5799f7aa98f8a752a383cdf53f461
+            95ce680d2cb92ee3380432ad361d5273
+        """.split() + [None],
+    },
 ]
 
 def _pcap_2014_12_13(sent, recv):
@@ -173,6 +231,10 @@ def _pcap_2015_10_08(sent, recv):
     if isinstance(sent, dpkt.http.Request):
         return sent.uri
     return sent.__class__.__name__
+
+def _pcap_2015_10_12(sent, recv):
+    if isinstance(recv, dpkt.http.Response):
+        return hashlib.md5(recv.body).hexdigest()
 
 def test_suite():
     errors = 0
