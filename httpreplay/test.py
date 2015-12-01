@@ -217,6 +217,23 @@ pcaps = [
             95ce680d2cb92ee3380432ad361d5273
         """.split() + [None],
     },
+    {
+        "handlers": {
+            80: http_handler(),
+            443: dummy_handler(),
+        },
+        # TODO Add per-stream support to this view.
+        "pcapfile": "pcaps/EK_MALWARE_2014-09-29-Nuclear-EK-traffic_mailware-traffic-analysis.net.pcap",
+        "description": "Extracts HTTP requests which are not acknowledged",
+        "format": lambda s, ts, sent, recv: _pcap_2014_09_29(s, sent, recv),
+        "output_count": 380,
+        "output": [
+            "56398e76be6355ad5999b262208a17c9",
+            "07a37ca8f8898d5e1d8041ca37e8b399",
+            "d41d8cd98f00b204e9800998ecf8427e",
+            None,
+        ],
+    },
 ]
 
 def _pcap_2014_12_13(sent, recv):
@@ -233,6 +250,14 @@ def _pcap_2015_10_08(sent, recv):
     return sent.__class__.__name__
 
 def _pcap_2015_10_12(sent, recv):
+    if isinstance(recv, dpkt.http.Response):
+        return hashlib.md5(recv.body).hexdigest()
+
+def _pcap_2014_09_29(s, sent, recv):
+    # Only handle one particular stream.
+    if s[1] != 49837 and s[3] != 49837:
+        return
+
     if isinstance(recv, dpkt.http.Response):
         return hashlib.md5(recv.body).hexdigest()
 

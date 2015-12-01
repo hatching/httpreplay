@@ -151,6 +151,15 @@ class TCPStream(Protocol):
                         "(timestamp %f).", ts)
             return
 
+        # A best guess would be; the SYN ACK/ACK packets were not captured.
+        if to_server and tcp.flags & dpkt.tcp.TH_ACK and tcp.data:
+            log.warning(
+                "We didn't receive SYN ACK or ACK packets but are proceeding "
+                "straight away to the TCP data (timestamp %f).", ts
+            )
+            self.cli, self.srv, self.state = tcp.seq, tcp.ack, "conn"
+            return self.state_conn(ts, tcp, to_server)
+
         if to_server or tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
             raise InvalidTcpPacketOrder(tcp)
 
