@@ -139,6 +139,12 @@ class TCPStream(Protocol):
             self.state = "init_syn"
             return
 
+        # Some PCAPs completely miss out on incoming traffic. Not really sure
+        # whether trying to parse this really makes sense, but here we go.
+        if to_server and tcp.flags == dpkt.tcp.TH_ACK:
+            self.cli, self.srv = tcp.seq, tcp.ack
+            return self.state_init_ack(ts, tcp, to_server)
+
         if to_server or tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
             raise InvalidTcpPacketOrder(tcp)
 
