@@ -28,12 +28,29 @@ def strip_content_length(f):
 _parse_headers = dpkt.http.parse_headers
 dpkt.http.parse_headers = strip_content_length
 
-def decode_gzip(content):
+def decode_gzip(ts, content):
     """Decompress HTTP gzip content, http://stackoverflow.com/a/2695575."""
-    return zlib.decompress(content, 16 + zlib.MAX_WBITS)
+    try:
+        return zlib.decompress(content, 16 + zlib.MAX_WBITS)
+    except zlib.error as e:
+        if "incomplete or truncated stream" in e.message:
+            log.critical(
+                "Error unpacking GZIP stream in HTTP response, it is quite "
+                "likely that something went wrong during the process of "
+                "stitching TCP/IP packets back together (timestamp %f).", ts
+            )
+
+def decode_pack200_gzip(ts, content):
+    """Decompress HTTP pack200/gzip content, a gzip-compressed compressed
+    JAR file.."""
+    log.critical(
+        "Proper pack200-gzip support is required to unpack this HTTP "
+        "response but this has not been implemented yet (timestamp %f).", ts
+    )
 
 content_encodings = {
     "gzip": decode_gzip,
+    "pack200-gzip": decode_pack200_gzip,
 }
 
 class HttpProtocol(Protocol):
@@ -60,7 +77,7 @@ class HttpProtocol(Protocol):
                 if content_encoding not in content_encodings:
                     raise UnknownHttpEncoding(content_encoding)
 
-                res.body = content_encodings[content_encoding](res.body)
+                res.body = content_encodings[content_encoding](ts, res.body)
 
             return res
         except dpkt.NeedData as e:
@@ -70,6 +87,12 @@ class HttpProtocol(Protocol):
             else:
                 log.critical(
                     "Unknown HTTP response error (timestamp %f): %s", ts, e
+                )
+        except dpkt.UnpackError as e:
+            if e.message == "missing chunk size":
+                log.warning(
+                    "Server informed us about a Chunked HTTP response but "
+                    "there doesn't appear to be one (timestamp %f).", ts
                 )
 
     def handle(self, s, ts, sent, recv):

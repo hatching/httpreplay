@@ -134,7 +134,7 @@ class TCPStream(Protocol):
 
         # The reply from a server when no service is listening on the given
         # port. Generally speaking the client will retry sending SYN packets.
-        if not to_server and tcp.flags == (dpkt.tcp.TH_RST | dpkt.tcp.TH_ACK):
+        if not to_server and tcp.flags & dpkt.tcp.TH_RST:
             self.parent.handle(self.s, ts, None, None, special="deadhost")
             self.state = "init_syn"
             return
@@ -144,6 +144,12 @@ class TCPStream(Protocol):
         if to_server and tcp.flags == dpkt.tcp.TH_ACK:
             self.cli, self.srv = tcp.seq, tcp.ack
             return self.state_init_ack(ts, tcp, to_server)
+
+        # Not much to comment here really.
+        if not to_server and tcp.flags == dpkt.tcp.TH_ACK:
+            log.warning("Server replied with an ACK to a SYN packet "
+                        "(timestamp %f).", ts)
+            return
 
         if to_server or tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
             raise InvalidTcpPacketOrder(tcp)
@@ -156,6 +162,12 @@ class TCPStream(Protocol):
         self.state = "init_ack"
 
     def state_init_ack(self, ts, tcp, to_server):
+        # Retransmission of the SYN packet. Let's ignore that for now.
+        if to_server and tcp.flags == dpkt.tcp.TH_SYN:
+            self.parent.handle(self.s, ts, TCPRetransmission(),
+                               None, special="deadhost")
+            return
+
         # Retransmission of the SYN ACK packet. Indicates that the client is
         # not responding within the given timeframe; a potential SYN flood?
         if not to_server and tcp.flags == (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
@@ -173,6 +185,18 @@ class TCPStream(Protocol):
         # The client has received a SYN ACK but is no longer interested in
         # connecting to this service and thus quits through a RST.
         if to_server and tcp.flags == dpkt.tcp.TH_RST:
+            return
+
+        if not to_server:
+            log.warning("The server is spamming the client even though an "
+                        "ACK has not been provided yet (timestamp %f).", ts)
+            return
+
+        # It is possible that a client sends out a request straight away along
+        # with the ACK packet (in case the PUSH flag is set?)
+        if tcp.flags == (dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK) and tcp.data:
+            self.state = "conn"
+            self.state_conn(ts, tcp, to_server)
             return
 
         if tcp.flags != dpkt.tcp.TH_ACK:
