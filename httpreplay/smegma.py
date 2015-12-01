@@ -132,6 +132,13 @@ class TCPStream(Protocol):
                                None, special="deadhost")
             return
 
+        # The reply from a server when no service is listening on the given
+        # port. Generally speaking the client will retry sending SYN packets.
+        if not to_server and tcp.flags == (dpkt.tcp.TH_RST | dpkt.tcp.TH_ACK):
+            self.parent.handle(self.s, ts, None, None, special="deadhost")
+            self.state = "init_syn"
+            return
+
         if to_server or tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
             raise InvalidTcpPacketOrder(tcp)
 
@@ -143,9 +150,18 @@ class TCPStream(Protocol):
         self.state = "init_ack"
 
     def state_init_ack(self, ts, tcp, to_server):
-        # Retransmission of the SYN ACK packet. Indicates that the server is
-        # not responding within the given timeframe; nothing too special.
+        # Retransmission of the SYN ACK packet. Indicates that the client is
+        # not responding within the given timeframe; a potential SYN flood?
         if not to_server and tcp.flags == (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
+            self.parent.handle(self.s, ts, TCPRetransmission(),
+                               None, special="synflood")
+            return
+
+        # The client has retransmitted the SYN ACK packet twice (usually) and
+        # now gives up through a RST packet.
+        if not to_server and tcp.flags == dpkt.tcp.TH_RST:
+            self.parent.handle(self.s, ts, TCPRetransmission(),
+                               None, special="synflood")
             return
 
         if tcp.flags != dpkt.tcp.TH_ACK:
