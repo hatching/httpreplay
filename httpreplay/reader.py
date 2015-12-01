@@ -34,6 +34,15 @@ class PcapReader(object):
     def set_udp_handler(self, udp):
         self.udp = udp
 
+    def _parse_ethernet(self, packet):
+        try:
+            return dpkt.ethernet.Ethernet(packet)
+        except dpkt.NeedData as e:
+            if e.message:
+                log.critical(
+                    "Unknown exception parsing ethernet packet: %s", e
+                )
+
     def process(self):
         if not self.pcap:
             return
@@ -41,7 +50,7 @@ class PcapReader(object):
         for ts, packet in self.pcap:
             if isinstance(packet, str):
                 if self.pcap.datalink() == dpkt.pcap.DLT_EN10MB:
-                    packet = dpkt.ethernet.Ethernet(packet)
+                    packet = self._parse_ethernet(packet)
                 elif self.pcap.datalink() == 101:
                     packet = dpkt.ip.IP(packet)
                 else:
