@@ -101,8 +101,8 @@ class TCPStream(Protocol):
         self.s = s
         self.packets = {}
         self.origins = {}
-        self.sent = ""
-        self.recv = ""
+        self.sent = []
+        self.recv = []
         self.conn = False
         self.ts = None
 
@@ -179,23 +179,21 @@ class TCPStream(Protocol):
         self.state = "conn"
 
     def ack_packets(self, seq, ack, to_server):
-        ret = Packet()
+        packets = []
+
         while (seq, ack) in self.packets:
             buf = self.packets.pop((seq, ack))
-            ret = Packet(buf + ret)
-            ret.ts = buf.ts
+            packets.insert(0, buf)
             seq -= len(buf)
             self.origins.pop((seq, ack), None)
 
-        if not self.ts:
-            self.ts = ret.ts
+        if not self.ts and packets:
+            self.ts = packets[0].ts
 
         if to_server:
-            self.sent += ret
+            self.sent += packets
         else:
-            self.recv += ret
-
-        return ret
+            self.recv += packets
 
     def state_conn(self, ts, tcp, to_server):
         if tcp.flags & dpkt.tcp.TH_ACK:
@@ -220,8 +218,10 @@ class TCPStream(Protocol):
             return
 
         if tcp.data and to_server and self.recv:
-            self.parent.handle(self.s, self.ts, self.sent, self.recv)
-            self.sent = self.recv = ""
+            sent = "".join(self.sent)
+            recv = "".join(self.recv)
+            self.parent.handle(self.s, self.ts, sent, recv)
+            self.sent, self.recv = [], []
             self.ts = None
 
         packet = Packet(tcp.data)
@@ -294,7 +294,9 @@ class TCPStream(Protocol):
 
     def finish(self):
         if self.sent or self.recv:
-            self.parent.handle(self.s, self.ts, self.sent, self.recv)
+            sent = "".join(self.sent)
+            recv = "".join(self.recv)
+            self.parent.handle(self.s, self.ts, sent, recv)
 
         if self.packets:
             log.warning(
