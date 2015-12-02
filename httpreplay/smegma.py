@@ -5,6 +5,7 @@
 import dpkt
 import logging
 import socket
+import tlslite
 
 from httpreplay.shoddy import Protocol
 
@@ -364,8 +365,10 @@ class TCPStream(Protocol):
                 " ".join("%f" % packet.ts for packet in self.packets.values())
             )
 
-class TLSStream(Protocol):
-    """Decrypts TLS streams into a TCPStream-like session."""
+class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
+    """Helper class for TLS stream decryption. This class wraps around
+    functionality found in the tlslite library which does the actual TLS
+    decryption."""
 
     tls_versions = {
         dpkt.ssl.SSL3_V: (3, 0),
@@ -373,3 +376,123 @@ class TLSStream(Protocol):
         dpkt.ssl.TLS11_V: (3, 2),
         dpkt.ssl.TLS12_V: (3, 3),
     }
+
+    def init_cipher(self, tls_version, cipher_suite, master_secret,
+                    client_random, server_random, cipher_implementations):
+        self._client = True
+        self.version = self.tls_versions[tls_version]
+
+        self._calcPendingStates(cipher_suite, master_secret, client_random,
+                                server_random, cipher_implementations)
+
+        self.server_cipher = self._recordLayer._pendingReadState
+        self.client_cipher = self._recordLayer._pendingWriteState
+
+    def decrypt_server(self, record_type, buf):
+        self._recordLayer._readState = self.server_cipher
+        return str(self._recordLayer._decryptThenMAC(record_type, bytearray(buf)))
+
+    def decrypt_client(self, record_type, buf):
+        self._recordLayer._readState = self.client_cipher
+        return str(self._recordLayer._decryptThenMAC(record_type, bytearray(buf)))
+
+class TLSStream(Protocol):
+    """Decrypts TLS streams into a TCPStream-like session."""
+
+    def init(self, secrets=None):
+        self.secrets = secrets
+        self.state = "init"
+        self.tls = _TLSStream(None)
+        self.sent = []
+        self.recv = []
+        self.raw_sent = ""
+        self.raw_recv = ""
+
+    def parse_record(self, record):
+        if record.type not in dpkt.ssl.RECORD_TYPES:
+            raise dpkt.ssl.SSL3Exception(
+                "Invalid record type: %d" % record.type
+            )
+
+        return dpkt.ssl.RECORD_TYPES[record.type](record.data)
+
+    def state_init(self, s, ts):
+        if not self.sent or not self.recv:
+            return
+
+        self.client_hello = self.parse_record(self.sent.pop(0))
+        self.server_hello = self.parse_record(self.recv.pop(0))
+        master_secret = self.secrets[self.server_hello.data.session_id]
+
+        self.tls.init_cipher(self.client_hello.data.version,
+                             self.server_hello.data.cipher_suite,
+                             master_secret,
+                             self.client_hello.data.random,
+                             self.server_hello.data.random,
+                             tlslite.handshakesettings.CIPHER_IMPLEMENTATIONS)
+
+        self.state = "client"
+        return True
+
+    def state_client(self, s, ts):
+        # Wait for the "Change Cipher Spec" record.
+        while self.sent:
+            if self.sent.pop(0).type == 20:
+                self.state = "server"
+                return True
+
+    def state_server(self, s, ts):
+        # Wait for the "Change Cipher Spec" record.
+        while self.recv:
+            if self.recv.pop(0).type == 20:
+                self.state = "decrypt"
+                return True
+
+    def state_decrypt(self, s, ts):
+        if not self.sent or not self.recv:
+            return
+
+        record = self.recv.pop(0)
+        self.tls.decrypt_server(record.type, record.data)
+
+        record = self.sent.pop(0)
+        self.tls.decrypt_client(record.type, record.data)
+
+        self.state = "stream"
+        return True
+
+    def state_stream(self, s, ts):
+        if self.sent and self.recv:
+            sent = self.sent.pop(0)
+            recv = self.recv.pop(0)
+
+            sent = self.tls.decrypt_client(sent.type, sent.data)
+            recv = self.tls.decrypt_server(recv.type, recv.data)
+
+            self.parent.handle(s, ts, sent, recv)
+            return True
+
+    states = {
+        "init": state_init,
+        "client": state_client,
+        "server": state_server,
+        "decrypt": state_decrypt,
+        "stream": state_stream,
+    }
+
+    def handle(self, s, ts, sent, recv):
+        # Parse sent TLS records.
+        self.raw_sent += sent
+        records, length = dpkt.ssl.tls_multi_factory(sent)
+        self.raw_sent = self.raw_sent[length:]
+        self.sent += records
+
+        # Parse received TLS records.
+        self.raw_recv += recv
+        records, length = dpkt.ssl.tls_multi_factory(recv)
+        self.raw_recv = self.raw_recv[length:]
+        self.recv += records
+
+        # Keep going while non-False is returned.
+        while self.states[self.state](self, s, ts):
+            pass
