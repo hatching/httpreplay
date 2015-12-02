@@ -422,13 +422,20 @@ class TLSStream(Protocol):
 
         self.client_hello = self.parse_record(self.sent.pop(0))
         self.server_hello = self.parse_record(self.recv.pop(0))
-        master_secret = self.secrets[self.server_hello.data.session_id]
+
+        client_random = self.client_hello.data.random
+        server_random = self.server_hello.data.random
+
+        # The master secret can be obtained through the session id as well
+        # as a (client random, server random) tuple.
+        if self.server_hello.data.session_id in self.secrets:
+            master_secret = self.secrets[self.server_hello.data.session_id]
+        elif (client_random, server_random) in self.secrets:
+            master_secret = self.secrets[client_random, server_random]
 
         self.tls.init_cipher(self.client_hello.data.version,
                              self.server_hello.data.cipher_suite,
-                             master_secret,
-                             self.client_hello.data.random,
-                             self.server_hello.data.random,
+                             master_secret, client_random, server_random,
                              tlslite.handshakesettings.CIPHER_IMPLEMENTATIONS)
 
         self.state = "client"
