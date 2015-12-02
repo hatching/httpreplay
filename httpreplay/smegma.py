@@ -28,35 +28,27 @@ class TCPPacketStreamer(Protocol):
         self.handlers = handlers
         self.spurious = {}
 
-        # For each handler we follow it all the way to the end (so to support
-        # nested protocol interpreters such as, e.g., HTTPS) and put our
-        # parent, which happens to be the pcap reader generally speaking, as
-        # protocol parent.
-        for handler in self.handlers.values():
-            while handler.parent:
-                handler = handler.parent
+    def init_handler(self, handler):
+        # Follow the handler all the way to the end (so to support nested
+        # protocol interpreters such as, e.g., HTTPS) and put our parent,
+        # which happens to be the pcap reader generally speaking, as parent.
+        while handler.parent:
+            handler = handler.parent
 
-            handler.parent = self.parent
+        handler.parent = self.parent
 
-    def handle(self, s, ts, sent, recv, special=None):
-        srcip, srcport, dstip, dstport = s
-
-        if special:
-            if special not in self.handlers:
-                log.warning("Unhandled special protocol %s", special)
-            else:
-                self.handlers[special].handle(s, ts, sent, recv)
-            return
-
+    def handler(self, (srcip, srcport, dstip, dstport)):
         if srcport in self.handlers:
-            h = self.handlers[srcport].handle
-            h((dstip, dstport, srcip, srcport), ts, recv, sent)
+            return self.handlers[srcport]
         elif dstport in self.handlers:
-            self.handlers[dstport].handle(s, ts, sent, recv)
+            return self.handlers[dstport]
         elif "generic" in self.handlers:
-            self.handlers["generic"].handle(s, ts, sent, recv)
+            return self.handlers["generic"]
         else:
+            # Returning the abstract Protocol class here so all packets will
+            # end up in nowhere but at least there will still be a parent.
             log.warning("Unhandled protocol port=%s/%s", srcport, dstport)
+            return Protocol
 
     def stream(self, ip, tcp, reverse=False):
         return (
@@ -73,7 +65,15 @@ class TCPPacketStreamer(Protocol):
 
         # This is a new connection.
         if sn not in self.streams and tcp.flags == dpkt.tcp.TH_SYN:
-            self.streams[sn] = TCPStream(self, sn)
+            # Pick a handler for this stream.
+            handler = self.handler(sn)
+
+            # Initialize the handler.
+            handler = handler()
+            self.init_handler(handler)
+
+            # Create a new instance of this handler.
+            self.streams[sn] = TCPStream(handler, sn)
 
         if sn in self.streams:
             s = self.streams[sn]
@@ -480,7 +480,11 @@ class TLSStream(Protocol):
         "stream": state_stream,
     }
 
-    def handle(self, s, ts, sent, recv):
+    def handle(self, s, ts, sent, recv, special=None):
+        if special:
+            self.parent.handle(s, ts, sent, recv, special)
+            return
+
         # Parse sent TLS records.
         self.raw_sent += sent
         records, length = dpkt.ssl.tls_multi_factory(sent)

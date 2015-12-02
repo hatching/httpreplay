@@ -100,7 +100,11 @@ class HttpProtocol(Protocol):
                     "there doesn't appear to be one (timestamp %f).", ts
                 )
 
-    def handle(self, s, ts, sent, recv):
+    def handle(self, s, ts, sent, recv, special=None):
+        if special:
+            self.parent.handle(s, ts, sent, recv, special)
+            return
+
         req = res = None
 
         if sent:
