@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 pcaps = [
     {
         "handlers": {
-            80: http_handler(),
+            80: http_handler,
         },
         "pcapfile": "pcaps/test.pcap",
         "description": "Tests TCP reassembly and basic HTTP extraction",
@@ -34,22 +34,22 @@ pcaps = [
     },
     {
         "handlers": {
-            25: dummy_handler(),
-            80: http_handler(),
+            25: dummy_handler,
+            80: http_handler,
         },
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
         "description": "Extracts HTTP requests which have no response",
         "format": lambda s, ts, sent, recv: (sent.method, sent.uri, recv),
         "output_count": 2,
         "output": [
-            ("POST", "/cmd.php", None),
-            ("GET", "/cmd.php", None),
+            ("POST", "/cmd.php", ""),
+            ("GET", "/cmd.php", ""),
         ],
     },
     {
         "handlers": {
-            25: forward_handler(),
-            80: dummy_handler(),
+            25: forward_handler,
+            80: dummy_handler,
         },
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
         "description": "Handle client disconnect and empty request",
@@ -61,7 +61,7 @@ pcaps = [
     },
     {
         "handlers": {
-            80: http_handler(),
+            80: http_handler,
         },
         "pcapfile": "pcaps/2014-12-13-download.pcap",
         "description": "Extracts HTTP response cut off during transmission",
@@ -73,9 +73,8 @@ pcaps = [
     },
     {
         "handlers": {
-            80: http_handler(),
-            48754: dummy_handler(),
-            "deadhost": forward_handler(),
+            80: http_handler,
+            48754: dummy_handler,
         },
         "pcapfile": "pcaps/2015-01-02-post-infection.pcap",
         "description": "Handles TCP Retransmission logic",
@@ -99,13 +98,12 @@ pcaps = [
     },
     {
         "handlers": {
-            80: http_handler(),
-            "deadhost": forward_handler(),
+            80: http_handler,
         },
         "pcapfile": "pcaps/2015-10-08-Nuclear-EK-example-2-traffic.pcap",
         "description": "Handles TCP Spurious Retransmission logic",
         "format": lambda s, ts, sent, recv: _pcap_2015_10_08(sent, recv),
-        "output_count": 16,
+        "output_count": 15,
         "output": [
             "/",
             "/wp-content/themes/mostashfa/hover/css/style_common.css",
@@ -122,32 +120,29 @@ pcaps = [
             "/harsh02.exe",
             "/harsh02.exe",
             "/favicon.ico",
-            "TCPRetransmission",
         ],
     },
     {
         "handlers": {
-            80: http_handler(),
-            10771: dummy_handler(),
-            29391: dummy_handler(),
-            "deadhost": forward_handler(),
+            80: http_handler,
+            10771: dummy_handler,
+            29391: dummy_handler,
         },
         "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
         "description": "Handle IGMP packets and HTTP on port 80",
         "format": lambda s, ts, sent, recv: _pcap_2015_10_13(sent, recv),
-        "output_count": 22,
+        "output_count": 11,
         "output": [
             ("GET", "/"),
             ("GET", "/view.js"),
             ("POST", "/forum/db.php"),
             ("GET", "/domain/195.22.28.194"),
-            "TCPRetransmission",
         ],
     },
     {
         "handlers": {
-            80: dummy_handler(),
-            "generic": http_handler(),
+            80: dummy_handler,
+            "generic": http_handler,
         },
         "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
         "description": "Handle HTTP on non-default ports",
@@ -162,8 +157,8 @@ pcaps = [
     },
     {
         "handlers": {
-            80: http_handler(),
-            443: dummy_handler(),
+            80: http_handler,
+            443: dummy_handler,
         },
         "pcapfile": "pcaps/2015-10-12-Angler-EK-sends-Bedep-traffic.pcap",
         "description": "Extracts HTTP requests which are not acknowledged",
@@ -219,8 +214,8 @@ pcaps = [
     },
     {
         "handlers": {
-            80: http_handler(),
-            443: dummy_handler(),
+            80: http_handler,
+            443: dummy_handler,
         },
         # TODO Add per-stream support to this view.
         "pcapfile": "pcaps/EK_MALWARE_2014-09-29-Nuclear-EK-traffic_mailware-traffic-analysis.net.pcap",
@@ -269,7 +264,7 @@ def test_suite():
             httpreplay.smegma.TCPPacketStreamer(reader, pcap["handlers"])
 
         count = 0
-        for s, ts, sent, recv in reader.process():
+        for s, ts, sent, recv, special in reader.process():
             output = pcap["format"](s, ts, sent, recv)
             if output not in pcap["output"]:
                 log.critical("Error in unittest output for %s: %s",

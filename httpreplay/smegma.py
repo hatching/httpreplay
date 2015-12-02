@@ -137,14 +137,14 @@ class TCPStream(Protocol):
         # Retransmission of the SYN packet. Indicates that the server is not
         # responding within the given timeframe and thus might be a dead host.
         if to_server and tcp.flags == dpkt.tcp.TH_SYN:
-            self.parent.handle(self.s, ts, TCPRetransmission(),
-                               None, special="deadhost")
+            # self.parent.handle(self.s, ts, TCPRetransmission(),
+            #                    None, special="deadhost")
             return
 
         # The reply from a server when no service is listening on the given
         # port. Generally speaking the client will retry sending SYN packets.
         if not to_server and tcp.flags & dpkt.tcp.TH_RST:
-            self.parent.handle(self.s, ts, None, None, special="deadhost")
+            # self.parent.handle(self.s, ts, None, None, special="deadhost")
             self.state = "init_syn"
             return
 
@@ -182,22 +182,22 @@ class TCPStream(Protocol):
     def state_init_ack(self, ts, tcp, to_server):
         # Retransmission of the SYN packet. Let's ignore that for now.
         if to_server and tcp.flags == dpkt.tcp.TH_SYN:
-            self.parent.handle(self.s, ts, TCPRetransmission(),
-                               None, special="deadhost")
+            # self.parent.handle(self.s, ts, TCPRetransmission(),
+            #                    None, special="deadhost")
             return
 
         # Retransmission of the SYN ACK packet. Indicates that the client is
         # not responding within the given timeframe; a potential SYN flood?
         if not to_server and tcp.flags == (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
-            self.parent.handle(self.s, ts, TCPRetransmission(),
-                               None, special="synflood")
+            # self.parent.handle(self.s, ts, TCPRetransmission(),
+            #                    None, special="synflood")
             return
 
         # The client has retransmitted the SYN ACK packet twice (usually) and
         # now gives up through a RST packet.
         if not to_server and tcp.flags == dpkt.tcp.TH_RST:
-            self.parent.handle(self.s, ts, TCPRetransmission(),
-                               None, special="synflood")
+            # self.parent.handle(self.s, ts, TCPRetransmission(),
+            #                    None, special="synflood")
             return
 
         # The client has received a SYN ACK but is no longer interested in
