@@ -475,13 +475,17 @@ class TLSStream(Protocol):
 
     def state_stream(self, s, ts):
         if self.sent and self.recv:
-            sent = self.sent.pop(0)
-            recv = self.recv.pop(0)
+            sent = []
+            while self.sent:
+                record = self.sent.pop(0)
+                sent.append(self.tls.decrypt_client(record.type, record.data))
 
-            sent = self.tls.decrypt_client(sent.type, sent.data)
-            recv = self.tls.decrypt_server(recv.type, recv.data)
+            recv = []
+            while self.recv:
+                record = self.recv.pop(0)
+                recv.append(self.tls.decrypt_server(record.type, record.data))
 
-            self.parent.handle(s, ts, "tls", sent, recv)
+            self.parent.handle(s, ts, "tls", "".join(sent), "".join(recv))
             return True
 
     def state_done(self, s, ts):
