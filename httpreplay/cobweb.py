@@ -139,10 +139,12 @@ class HttpProtocol(Protocol):
 
         if sent:
             req = self.parse_request(ts, sent)
+            req.raw = sent
 
         # Only try to decode the HTTP response if the request was valid HTTP.
         if req and recv:
             res = self.parse_response(ts, recv)
+            res.raw = recv
 
         protocols = {
             "tcp": "http",
