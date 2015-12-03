@@ -13,9 +13,6 @@ class ForwardProtocol(httpreplay.shoddy.Protocol):
     def handle(self, s, ts, sent, recv):
         self.parent.handle(s, ts, sent, recv)
 
-def readpcap(pcap_file, tlsmaster):
-    pass
-
 def dummy_handler():
     """Dummy Protocol handler that forwards packets to /dev/null."""
     return httpreplay.shoddy.Protocol()
@@ -30,6 +27,9 @@ def https_handler(tlsmaster={}):
     return httpreplay.smegma.TLSStream(
         httpreplay.cobweb.HttpProtocol(), tlsmaster
     )
+
+def tls_handler(tlsmaster={}):
+    return httpreplay.smegma.TLSStream(None, tlsmaster)
 
 def smtp_handler():
     return httpreplay.cobweb.SmtpProtocol()
