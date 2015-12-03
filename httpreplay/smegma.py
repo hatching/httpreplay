@@ -432,6 +432,11 @@ class TLSStream(Protocol):
             master_secret = self.secrets[self.server_hello.data.session_id]
         elif (client_random, server_random) in self.secrets:
             master_secret = self.secrets[client_random, server_random]
+        else:
+            log.info("Could not find TLS master secret for stream "
+                     "%s:%d -> %s:%d, skipping it.", *s)
+            self.state = "done"
+            return
 
         self.tls.init_cipher(self.client_hello.data.version,
                              self.server_hello.data.cipher_suite,
@@ -479,12 +484,20 @@ class TLSStream(Protocol):
             self.parent.handle(s, ts, "tls", sent, recv)
             return True
 
+    def state_done(self, s, ts):
+        while self.sent:
+            self.sent.pop(0)
+
+        while self.recv:
+            self.recv.pop(0)
+
     states = {
         "init": state_init,
         "client": state_client,
         "server": state_server,
         "decrypt": state_decrypt,
         "stream": state_stream,
+        "done": state_done,
     }
 
     def handle(self, s, ts, protocol, sent, recv):
