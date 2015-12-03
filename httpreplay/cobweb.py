@@ -11,22 +11,52 @@ from httpreplay.shoddy import Protocol
 
 log = logging.getLogger(__name__)
 
-class _strip_content_length(dict):
-    """Keeps the Content-Length header but returns False when dpkt.http checks
-    whether we have the key in our dictionary."""
+def parse_body(f, headers):
+    """Return HTTP body parsed from a file object, given HTTP header dict.
+    This is a modified version of dpkt.http.parse_body() which tolerates cut
+    off HTTP bodies."""
+    if headers.get("transfer-encoding", "").lower() == "chunked":
+        l = []
+        found_end = False
+        while True:
+            line = f.readline()
+            if not line:
+                found_end = True
 
-    def __contains__(self, key):
-        if key == "content-length":
-            return False
+            n = int(line.strip() or "0", 16)
+            if not n:
+                found_end = True
 
-        return super(_strip_content_length, self).__contains__(key)
+            buf = f.read(n)
+            if f.readline().strip():
+                break
 
-def strip_content_length(f):
-    return _strip_content_length(_parse_headers(f))
+            # TODO Should we continue stitching here or just leave it as is?
+            if n and len(buf) == n:
+                l.append(buf)
+            else:
+                break
 
-# We pretend as if the "Content-Length" header is not available.
-_parse_headers = dpkt.http.parse_headers
-dpkt.http.parse_headers = strip_content_length
+        if not found_end:
+            raise dpkt.NeedData("premature end of chunked body")
+
+        body = "".join(l)
+    elif "content-length" in headers:
+        n = int(headers["content-length"])
+        body = f.read(n)
+        # TODO Report a warning if we couldn't read the entire body (but don't
+        # raise an exception as dpkt.http would do).
+    elif "content-type" in headers:
+        body = f.read()
+    else:
+        # XXX - need to handle HTTP/0.9
+        body = ""
+
+    return body
+
+# We override the standard dpkt.http.parse_body() method with one that
+# tolerates cut off HTTP bodies slightly better.
+dpkt.http.parse_body = parse_body
 
 def decode_gzip(ts, content):
     """Decompress HTTP gzip content, http://stackoverflow.com/a/2695575."""
