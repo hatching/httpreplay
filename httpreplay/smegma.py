@@ -278,7 +278,7 @@ class TCPStream(Protocol):
         if tcp.data and to_server and self.recv:
             sent = "".join(self.sent)
             recv = "".join(self.recv)
-            self.parent.handle(self.s, self.ts, sent, recv)
+            self.parent.handle(self.s, self.ts, "tcp", sent, recv)
             self.sent, self.recv = [], []
             self.ts = None
 
@@ -354,7 +354,7 @@ class TCPStream(Protocol):
         if self.sent or self.recv:
             sent = "".join(self.sent)
             recv = "".join(self.recv)
-            self.parent.handle(self.s, self.ts, sent, recv)
+            self.parent.handle(self.s, self.ts, "tcp", sent, recv)
 
         if self.packets:
             log.warning(
@@ -476,7 +476,7 @@ class TLSStream(Protocol):
             sent = self.tls.decrypt_client(sent.type, sent.data)
             recv = self.tls.decrypt_server(recv.type, recv.data)
 
-            self.parent.handle(s, ts, sent, recv)
+            self.parent.handle(s, ts, "tls", sent, recv)
             return True
 
     states = {
@@ -487,9 +487,9 @@ class TLSStream(Protocol):
         "stream": state_stream,
     }
 
-    def handle(self, s, ts, sent, recv, special=None):
-        if special:
-            self.parent.handle(s, ts, sent, recv, special)
+    def handle(self, s, ts, protocol, sent, recv):
+        if protocol != "tcp":
+            self.parent.handle(s, ts, protocol, sent, recv)
             return
 
         # Parse sent TLS records.

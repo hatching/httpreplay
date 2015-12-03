@@ -100,9 +100,9 @@ class HttpProtocol(Protocol):
                     "there doesn't appear to be one (timestamp %f).", ts
                 )
 
-    def handle(self, s, ts, sent, recv, special=None):
-        if special:
-            self.parent.handle(s, ts, sent, recv, special)
+    def handle(self, s, ts, protocol, sent, recv):
+        if protocol != "tcp" and protocol != "tls":
+            self.parent.handle(s, ts, protocol, sent, recv)
             return
 
         req = res = None
@@ -114,7 +114,13 @@ class HttpProtocol(Protocol):
         if req and recv:
             res = self.parse_response(ts, recv)
 
-        self.parent.handle(s, ts, req or sent, res or recv)
+        protocols = {
+            "tcp": "http",
+            "tls": "https"
+        }
+
+        self.parent.handle(s, ts, protocols[protocol],
+                           req or sent, res or recv)
 
 class SmtpProtocol(Protocol):
     """Interprets the SMTP protocol."""

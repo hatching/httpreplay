@@ -264,7 +264,7 @@ def test_suite():
             httpreplay.smegma.TCPPacketStreamer(reader, pcap["handlers"])
 
         count = 0
-        for s, ts, sent, recv, special in reader.process():
+        for s, ts, protocol, sent, recv in reader.process():
             output = pcap["format"](s, ts, sent, recv)
             if output not in pcap["output"]:
                 log.critical("Error in unittest output for %s: %s",

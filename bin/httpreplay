@@ -45,5 +45,5 @@ if __name__ == "__main__":
     reader = httpreplay.reader.PcapReader(args.pcapfile)
     reader.tcp = httpreplay.smegma.TCPPacketStreamer(reader, handlers)
 
-    for s, ts, sent, recv, special in reader.process():
-        print s, "%f" % ts, getattr(sent, "uri", None)
+    for s, ts, protocol, sent, recv in reader.process():
+        print s, "%f" % ts, protocol, getattr(sent, "uri", None)

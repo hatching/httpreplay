@@ -98,5 +98,5 @@ class PcapReader(object):
         while self.values:
             yield self.values.pop(0)
 
-    def handle(self, s, ts, sent, recv, special=None):
-        self.values.append((s, ts, sent, recv, special))
+    def handle(self, s, ts, protocol, sent, recv):
+        self.values.append((s, ts, protocol, sent, recv))
