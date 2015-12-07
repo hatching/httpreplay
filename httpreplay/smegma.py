@@ -423,6 +423,22 @@ class TLSStream(Protocol):
         self.client_hello = self.parse_record(self.sent.pop(0))
         self.server_hello = self.parse_record(self.recv.pop(0))
 
+        if not isinstance(self.client_hello.data, dpkt.ssl.TLSClientHello):
+            log.info(
+                "Stream %s:%d -> %s:%d doesn't appear to be a proper TLS "
+                "stream (perhaps the client is outdated), skipping it.", *s
+            )
+            self.state = "done"
+            return
+
+        if not isinstance(self.server_hello.data, dpkt.ssl.TLSServerHello):
+            log.info(
+                "Stream %s:%d -> %s:%d doesn't appear to be a proper TLS "
+                "stream (perhaps the server is outdated), skipping it.", *s
+            )
+            self.state = "done"
+            return
+
         client_random = self.client_hello.data.random
         server_random = self.server_hello.data.random
 
@@ -509,17 +525,23 @@ class TLSStream(Protocol):
             self.parent.handle(s, ts, protocol, sent, recv)
             return
 
-        # Parse sent TLS records.
-        self.raw_sent += sent
-        records, length = dpkt.ssl.tls_multi_factory(sent)
-        self.raw_sent = self.raw_sent[length:]
-        self.sent += records
+        try:
+            # Parse sent TLS records.
+            self.raw_sent += sent
+            records, length = dpkt.ssl.tls_multi_factory(sent)
+            self.raw_sent = self.raw_sent[length:]
+            self.sent += records
 
-        # Parse received TLS records.
-        self.raw_recv += recv
-        records, length = dpkt.ssl.tls_multi_factory(recv)
-        self.raw_recv = self.raw_recv[length:]
-        self.recv += records
+            # Parse received TLS records.
+            self.raw_recv += recv
+            records, length = dpkt.ssl.tls_multi_factory(recv)
+            self.raw_recv = self.raw_recv[length:]
+            self.recv += records
+        except dpkt.ssl.SSL3Exception:
+            # This is not a TLS stream or we're unable to decrypt it so we
+            # skip it and forward it straight ahead to our parent.
+            self.parent.handle(s, ts, protocol, sent, recv)
+            return
 
         # Keep going while non-False is returned.
         while self.states[self.state](self, s, ts):

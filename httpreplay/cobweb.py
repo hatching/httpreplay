@@ -88,12 +88,19 @@ content_encodings = {
     "none": decode_none,
 }
 
+class _Response(object):
+    """Dummy HTTP response object which only has the raw paremeter set."""
+    def __init__(self, raw):
+        self.raw = raw
+
 class HttpProtocol(Protocol):
     """Interprets the TCP or TLS stream as HTTP request and response."""
 
     def parse_request(self, ts, sent):
         try:
-            return dpkt.http.Request(sent)
+            res = dpkt.http.Request(sent)
+            res.raw = sent
+            return res
         except dpkt.UnpackError as e:
             if e.message.startswith("invalid http method"):
                 log.warning("This is not a HTTP request (timestamp %f).", ts)
@@ -114,6 +121,7 @@ class HttpProtocol(Protocol):
 
                 res.body = content_encodings[content_encoding](ts, res.body)
 
+            res.raw = recv
             return res
         except dpkt.NeedData as e:
             if e.message == "premature end of chunked body":
@@ -130,6 +138,9 @@ class HttpProtocol(Protocol):
                     "there doesn't appear to be one (timestamp %f).", ts
                 )
 
+        # Return dummy object.
+        return _Response(recv)
+
     def handle(self, s, ts, protocol, sent, recv):
         if protocol != "tcp" and protocol != "tls":
             self.parent.handle(s, ts, protocol, sent, recv)
@@ -139,20 +150,23 @@ class HttpProtocol(Protocol):
 
         if sent:
             req = self.parse_request(ts, sent)
-            req.raw = sent
+
+        protocols = {
+            "tcp": "http",
+            "tls": "https",
+        }
 
         # Only try to decode the HTTP response if the request was valid HTTP.
         if req and recv:
             res = self.parse_response(ts, recv)
-            res.raw = recv
 
-        protocols = {
-            "tcp": "http",
-            "tls": "https"
-        }
-
-        self.parent.handle(s, ts, protocols[protocol],
-                           req or sent, res or recv)
+            # Report this stream as being a valid HTTP stream.
+            self.parent.handle(s, ts, protocols[protocol],
+                               req or sent, res)
+        else:
+            # This wasn't a valid HTTP stream so we forward the original TCP
+            # or TLS stream straight ahead to our parent.
+            self.parent.handle(s, ts, protocol, sent, recv)
 
 class SmtpProtocol(Protocol):
     """Interprets the SMTP protocol."""
