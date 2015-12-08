@@ -64,7 +64,7 @@ def decode_gzip(ts, content):
         return zlib.decompress(content, 16 + zlib.MAX_WBITS)
     except zlib.error as e:
         if "incomplete or truncated stream" in e.message:
-            log.critical(
+            log.warning(
                 "Error unpacking GZIP stream in HTTP response, it is quite "
                 "likely that something went wrong during the process of "
                 "stitching TCP/IP packets back together (timestamp %f).", ts
@@ -105,7 +105,7 @@ class HttpProtocol(Protocol):
             if e.message.startswith("invalid http method"):
                 log.warning("This is not a HTTP request (timestamp %f).", ts)
             else:
-                log.critical(
+                log.warning(
                     "Unknown HTTP request error (timestamp %f): %s", ts, e
                 )
 
@@ -128,7 +128,7 @@ class HttpProtocol(Protocol):
                 log.warning("Chunked HTTP response is most likely missing "
                             "data in the network stream (timestamp %f).", ts)
             else:
-                log.critical(
+                log.warning(
                     "Unknown HTTP response error (timestamp %f): %s", ts, e
                 )
         except dpkt.UnpackError as e:
