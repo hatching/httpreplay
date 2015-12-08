@@ -382,11 +382,17 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         self._client = True
         self.version = self.tls_versions[tls_version]
 
-        self._calcPendingStates(cipher_suite, master_secret, client_random,
-                                server_random, cipher_implementations)
+        try:
+            self._calcPendingStates(cipher_suite, master_secret,
+                                    client_random, server_random,
+                                    cipher_implementations)
+        except AssertionError:
+            log.critical("Unsupported TLS cipher suite: 0x%x.", cipher_suite)
+            return
 
         self.server_cipher = self._recordLayer._pendingReadState
         self.client_cipher = self._recordLayer._pendingWriteState
+        return True
 
     def decrypt_server(self, record_type, buf):
         self._recordLayer._readState = self.server_cipher
@@ -454,10 +460,18 @@ class TLSStream(Protocol):
             self.state = "done"
             return
 
-        self.tls.init_cipher(self.client_hello.data.version,
-                             self.server_hello.data.cipher_suite,
-                             master_secret, client_random, server_random,
-                             tlslite.handshakesettings.CIPHER_IMPLEMENTATIONS)
+        # It could be the cipher suite passed along by the server is not
+        # supported, in that case we can't decrypt this TLS stream.
+        cipher_success = self.tls.init_cipher(
+            self.client_hello.data.version,
+            self.server_hello.data.cipher_suite,
+            master_secret, client_random, server_random,
+            tlslite.handshakesettings.CIPHER_IMPLEMENTATIONS
+        )
+
+        if not cipher_success:
+            self.state = "done"
+            return True
 
         self.state = "client"
         return True
