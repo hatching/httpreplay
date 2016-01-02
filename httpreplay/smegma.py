@@ -370,12 +370,21 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
     functionality found in the tlslite library which does the actual TLS
     decryption."""
 
-    tls_versions = {
-        dpkt.ssl.SSL3_V: (3, 0),
-        dpkt.ssl.TLS1_V: (3, 1),
-        dpkt.ssl.TLS11_V: (3, 2),
-        dpkt.ssl.TLS12_V: (3, 3),
-    }
+    if not hasattr(dpkt.ssl, "SSL3_V"):
+        enabled = False
+        log.critical(
+            "You are using an old version of the dpkt Python library, please "
+            "update it to the latest version (`pip install dpkt`) or "
+            "TLS/HTTPS decryption will not work properly."
+        )
+    else:
+        enabled = True
+        tls_versions = {
+            dpkt.ssl.SSL3_V: (3, 0),
+            dpkt.ssl.TLS1_V: (3, 1),
+            dpkt.ssl.TLS11_V: (3, 2),
+            dpkt.ssl.TLS12_V: (3, 3),
+        }
 
     def init_cipher(self, tls_version, cipher_suite, master_secret,
                     client_random, server_random, cipher_implementations):
@@ -535,7 +544,7 @@ class TLSStream(Protocol):
     }
 
     def handle(self, s, ts, protocol, sent, recv):
-        if protocol != "tcp":
+        if protocol != "tcp" or not self.tls.enabled:
             self.parent.handle(s, ts, protocol, sent, recv)
             return
 
