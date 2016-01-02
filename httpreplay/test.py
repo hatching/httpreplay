@@ -19,7 +19,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/test.pcap",
         "description": "Tests TCP reassembly and basic HTTP extraction",
-        "format": lambda s, ts, sent, recv: (ts, sent.uri, len(recv.body)),
+        "format": lambda s, ts, p, sent, recv: (ts, sent.uri, len(recv.body)),
         "output_count": 8,
         "output": [
             (1278472581.261381, "/sd/facebook_icon.png", 3462),
@@ -39,7 +39,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
         "description": "Extracts HTTP requests which have no response",
-        "format": lambda s, ts, sent, recv: (sent.method, sent.uri, recv),
+        "format": lambda s, ts, p, sent, recv: (sent.method, sent.uri, recv),
         "output_count": 2,
         "output": [
             ("POST", "/cmd.php", ""),
@@ -53,7 +53,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap",
         "description": "Handle client disconnect and empty request",
-        "format": lambda s, ts, sent, recv: (s[0], sent, recv),
+        "format": lambda s, ts, p, sent, recv: (s[0], sent, recv),
         "output_count": 2,
         "output": [
             ("172.16.165.133", "", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
@@ -65,7 +65,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2014-12-13-download.pcap",
         "description": "Extracts HTTP response cut off during transmission",
-        "format": lambda s, ts, sent, recv: _pcap_2014_12_13(sent, recv),
+        "format": lambda s, ts, p, sent, recv: _pcap_2014_12_13(sent, recv),
         "output_count": 1,
         "output": [
             ("/zp/zp-core/zp-extensions/tiny_mce/plugins/ajaxfilemanager/inc/main.php", 451729, 35040),
@@ -78,7 +78,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2015-01-02-post-infection.pcap",
         "description": "Handles TCP Retransmission logic",
-        "format": lambda s, ts, sent, recv: (s, sent.__class__.__name__),
+        "format": lambda s, ts, p, sent, recv: (s, sent.__class__.__name__),
         "output_count": 24,
         "output": [
             (("192.168.138.163", 49199, "219.70.113.58", 48754), "TCPRetransmission"),
@@ -102,7 +102,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2015-10-08-Nuclear-EK-example-2-traffic.pcap",
         "description": "Handles TCP Spurious Retransmission logic",
-        "format": lambda s, ts, sent, recv: _pcap_2015_10_08(sent, recv),
+        "format": lambda s, ts, p, sent, recv: _pcap_2015_10_08(sent, recv),
         "output_count": 15,
         "output": [
             "/",
@@ -130,7 +130,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
         "description": "Handle IGMP packets and HTTP on port 80",
-        "format": lambda s, ts, sent, recv: _pcap_2015_10_13(sent, recv),
+        "format": lambda s, ts, p, sent, recv: _pcap_2015_10_13(sent, recv),
         "output_count": 11,
         "output": [
             ("GET", "/"),
@@ -146,7 +146,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
         "description": "Handle HTTP on non-default ports",
-        "format": lambda s, ts, sent, recv: _pcap_2015_10_13(sent, recv),
+        "format": lambda s, ts, p, sent, recv: _pcap_2015_10_13(sent, recv),
         "output_count": 4,
         "output": [
             ("GET", "/bound/shout-32517633"),
@@ -162,7 +162,7 @@ pcaps = [
         },
         "pcapfile": "pcaps/2015-10-12-Angler-EK-sends-Bedep-traffic.pcap",
         "description": "Extracts HTTP requests which are not acknowledged",
-        "format": lambda s, ts, sent, recv: _pcap_2015_10_12(sent, recv),
+        "format": lambda s, ts, p, sent, recv: _pcap_2015_10_12(sent, recv),
         "output_count": 46,
         "output": """
             719acc7111036d05908a2bbc2edb59cb
@@ -220,7 +220,7 @@ pcaps = [
         # TODO Add per-stream support to this view.
         "pcapfile": "pcaps/EK_MALWARE_2014-09-29-Nuclear-EK-traffic_mailware-traffic-analysis.net.pcap",
         "description": "Extracts HTTP requests which are not acknowledged",
-        "format": lambda s, ts, sent, recv: _pcap_2014_09_29(s, sent, recv),
+        "format": lambda s, ts, p, sent, recv: _pcap_2014_09_29(s, sent, recv),
         "output_count": 380,
         "output": [
             "56398e76be6355ad5999b262208a17c9",
