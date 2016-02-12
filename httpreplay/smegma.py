@@ -522,7 +522,18 @@ class TLSStream(Protocol):
             recv = []
             while self.recv:
                 record = self.recv.pop(0)
-                recv.append(self.tls.decrypt_server(record.type, record.data))
+
+                try:
+                    recv.append(
+                        self.tls.decrypt_server(record.type, record.data)
+                    )
+                except tlslite.errors.TLSProtocolException:
+                    log.info(
+                        "Error decrypting TLS content, perhaps something "
+                        "went wrong during the process of stitching packets "
+                        "back together in the right order (timestamp %f).",
+                        ts,
+                    )
 
             self.parent.handle(s, ts, "tls", "".join(sent), "".join(recv))
             return True
