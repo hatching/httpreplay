@@ -374,7 +374,7 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         enabled = False
         log.critical(
             "You are using an old version of the dpkt Python library, please "
-            "update it to the latest version (`pip install dpkt`) or "
+            "update it to the latest version (`pip install -U dpkt`) or "
             "TLS/HTTPS decryption will not work properly."
         )
     else:
