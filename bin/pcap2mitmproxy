@@ -1,0 +1,73 @@
+#!/usr/bin/env python
+# Copyright (C) 2016 Maximilian Hils <git@maximilianhils.com>
+# This file is part of HTTPReplay - http://jbremer.org/httpreplay/
+# See the file 'LICENSE' for copying permission.
+import logging
+
+import click
+
+from io import BytesIO
+
+from httpreplay.reader import PcapReader
+from httpreplay.smegma import TCPPacketStreamer
+from httpreplay.cut import (
+    http_handler, https_handler, smtp_handler
+)
+from httpreplay.misc import read_tlsmaster
+from mitmproxy import models
+from mitmproxy.flow import FlowWriter
+from netlib.http import http1
+
+logging.basicConfig(level=logging.INFO)
+
+
+@click.command()
+@click.argument("pcapfile", type=click.Path(file_okay=True))
+@click.argument("mitmfile", type=click.File("wb"))
+@click.option("--tlsmaster", type=click.Path(file_okay=True))
+def convert(pcapfile, mitmfile, tlsmaster):
+    if tlsmaster:
+        tlsmaster = read_tlsmaster(tlsmaster)
+    else:
+        tlsmaster = {}
+
+    handlers = {
+        25: smtp_handler,
+        80: http_handler,
+        8000: http_handler,
+        8080: http_handler,
+        443: lambda: https_handler(tlsmaster),
+        4443: lambda: https_handler(tlsmaster),
+    }
+
+    reader = PcapReader(pcapfile)
+    reader.tcp = TCPPacketStreamer(reader, handlers)
+    writer = FlowWriter(mitmfile)
+
+    for addrs, timestamp, protocol, sent, recv in reader.process():
+        if protocol not in ("http", "https"):
+            continue
+        client_conn = models.ClientConnection.make_dummy(addrs[:2])
+        client_conn.timestamp_start = timestamp
+        server_conn = models.ServerConnection.make_dummy(addrs[2:])
+        server_conn.timestamp_start = timestamp
+        flow = models.HTTPFlow(client_conn, server_conn)
+
+        # We need to manually read request and response bodies as the PCAP may be incomplete
+        # and we'd complain on an unexpected body length.
+        req_io = BytesIO(sent.raw)
+        request = http1.read_request_head(req_io)
+        request.data.content = b"".join(http1.read_body(req_io, -1, None))
+        flow.request = models.HTTPRequest.wrap(request)
+        flow.request.host, flow.request.port = addrs[2:]
+
+        resp_io = BytesIO(recv.raw)
+        response = http1.read_response_head(resp_io)
+        response.data.content = b"".join(http1.read_body(resp_io, -1, None))
+        flow.response = models.HTTPResponse.wrap(response)
+
+        writer.add(flow)
+
+
+if __name__ == "__main__":
+    convert()
