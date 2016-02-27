@@ -2,9 +2,10 @@
 # Copyright (C) 2016 Maximilian Hils <git@maximilianhils.com>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
-import logging
 
 import click
+import logging
+import sys
 
 from io import BytesIO
 
@@ -14,12 +15,23 @@ from httpreplay.cut import (
     http_handler, https_handler, smtp_handler
 )
 from httpreplay.misc import read_tlsmaster
-from mitmproxy import models
-from mitmproxy.flow import FlowWriter
-from netlib.http import http1
+
+try:
+    from libmproxy import models
+    from libmproxy.flow import FlowWriter
+    from netlib.http import http1
+except ImportError:
+    try:
+        from mitmproxy import models
+        from mitmproxy.flow import FlowWriter
+        from netlib.http import http1
+    except ImportError:
+        sys.exit(
+            "In order to use this utility it is required to have the "
+            "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
+        )
 
 logging.basicConfig(level=logging.INFO)
-
 
 @click.command()
 @click.argument("pcapfile", type=click.Path(file_okay=True))
