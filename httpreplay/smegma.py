@@ -580,3 +580,16 @@ class TLSStream(Protocol):
         # Keep going while non-False is returned.
         while self.states[self.state](self, s, ts):
             pass
+
+# Until our pull request (https://github.com/tomato42/tlslite-ng/pull/96) is
+# accepted we're going to monkey patch tlslite to contain our desired changes.
+_cs = tlslite.constants.CipherSuite
+if 0xc009 not in _cs.ietfNames:
+    _cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA = 0xC009
+    _cs.ietfNames[0xC009] = 'TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA'
+    _cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA = 0xC00A
+    _cs.ietfNames[0xC00A] = 'TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA'
+    _cs.aes128Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
+    _cs.aes256Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
+    _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
+    _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
