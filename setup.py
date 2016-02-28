@@ -15,6 +15,7 @@ setup(
     ],
     scripts=[
         "bin/httpreplay",
+        "bin/pcap2mitmproxy",
     ],
     license="GPLv3",
     description="Properly interpret, decrypt, and replay pcap files",
@@ -22,4 +23,9 @@ setup(
         "dpkt",
         "tlslite-ng",
     ],
+    extras_require={
+        "mitmproxy": [
+            "mitmproxy>=0.16",
+        ],
+    },
 )
