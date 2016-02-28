@@ -56,30 +56,51 @@ def convert(pcapfile, mitmfile, tlsmaster):
     reader.tcp = TCPPacketStreamer(reader, handlers)
     writer = FlowWriter(mitmfile)
 
-    for addrs, timestamp, protocol, sent, recv in reader.process():
+    # Sort the http/https requests and responses by their timestamp.
+    l = sorted(reader.process(), key=lambda x: x[1])
+    for addrs, timestamp, protocol, sent, recv in l:
         if protocol not in ("http", "https"):
             continue
-        client_conn = models.ClientConnection.make_dummy(addrs[:2])
+
+        srcip, srcport, dstip, dstport = addrs
+
+        client_conn = models.ClientConnection.make_dummy((srcip, srcport))
         client_conn.timestamp_start = timestamp
-        server_conn = models.ServerConnection.make_dummy(addrs[2:])
+
+        server_conn = models.ServerConnection.make_dummy((dstip, dstport))
         server_conn.timestamp_start = timestamp
+
         flow = models.HTTPFlow(client_conn, server_conn)
 
-        # We need to manually read request and response bodies as the PCAP may be incomplete
-        # and we'd complain on an unexpected body length.
+        # We need to manually read request and response bodies as the PCAP may
+        # be incomplete and we'd complain on an unexpected body length.
         req_io = BytesIO(sent.raw)
         request = http1.read_request_head(req_io)
-        request.data.content = b"".join(http1.read_body(req_io, -1, None))
+        request_body_size = http1.expected_http_body_size(request)
+
+        if request_body_size > 0:
+            request_body_size = -1
+
+        request.data.content = \
+            "".join(http1.read_body(req_io, request_body_size, None))
+
         flow.request = models.HTTPRequest.wrap(request)
-        flow.request.host, flow.request.port = addrs[2:]
+        flow.request.host, flow.request.port = dstip, dstport
+        flow.request.scheme = protocol
 
         resp_io = BytesIO(recv.raw)
         response = http1.read_response_head(resp_io)
-        response.data.content = b"".join(http1.read_body(resp_io, -1, None))
+        response_body_size = http1.expected_http_body_size(request, response)
+
+        if response_body_size > 0:
+            response_body_size = -1
+
+        response.data.content = \
+            "".join(http1.read_body(resp_io, response_body_size, None))
+
         flow.response = models.HTTPResponse.wrap(response)
 
         writer.add(flow)
-
 
 if __name__ == "__main__":
     convert()
