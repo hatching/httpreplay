@@ -169,6 +169,10 @@ class TCPStream(Protocol):
             self.cli, self.srv, self.state = tcp.seq, tcp.ack, "conn"
             return self.state_conn(ts, tcp, to_server)
 
+        if not to_server and tcp.flags == (dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK):
+            self.state = "init_syn"
+            return
+
         if to_server or tcp.flags != (dpkt.tcp.TH_SYN | dpkt.tcp.TH_ACK):
             raise InvalidTcpPacketOrder(tcp)
 
