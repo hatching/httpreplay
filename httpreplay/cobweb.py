@@ -92,6 +92,7 @@ class _Response(object):
     """Dummy HTTP response object which only has the raw paremeter set."""
     def __init__(self, raw):
         self.raw = raw
+        self.body = None
 
 class HttpProtocol(Protocol):
     """Interprets the TCP or TLS stream as HTTP request and response."""
