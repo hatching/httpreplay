@@ -82,10 +82,15 @@ def decode_none(ts, content):
     """None encoding."""
     return content
 
+def decode_identity(ts, content):
+    """Identity encoding, an encoding that doesn't change the content."""
+    return content
+
 content_encodings = {
     "gzip": decode_gzip,
     "pack200-gzip": decode_pack200_gzip,
     "none": decode_none,
+    "identity": decode_identity,
 }
 
 class _Response(object):
