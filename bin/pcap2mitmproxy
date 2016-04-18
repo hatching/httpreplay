@@ -34,9 +34,9 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 
 @click.command()
-@click.argument("pcapfile", type=click.Path(file_okay=True))
+@click.argument("pcapfile", type=click.File("rb"))
 @click.argument("mitmfile", type=click.File("wb"))
-@click.option("--tlsmaster", type=click.Path(file_okay=True))
+@click.option("--tlsmaster", type=click.Path(file_okay=True), help="TLS master secrets file")
 def convert(pcapfile, mitmfile, tlsmaster):
     if tlsmaster:
         tlsmaster = read_tlsmaster(tlsmaster)
