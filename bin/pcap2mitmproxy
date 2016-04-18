@@ -37,7 +37,8 @@ logging.basicConfig(level=logging.INFO)
 @click.argument("pcapfile", type=click.File("rb"))
 @click.argument("mitmfile", type=click.File("wb"))
 @click.option("--tlsmaster", type=click.Path(file_okay=True), help="TLS master secrets file")
-def convert(pcapfile, mitmfile, tlsmaster):
+@click.option('--stream/--no-stream', default=False)
+def convert(pcapfile, mitmfile, tlsmaster, stream):
     if tlsmaster:
         tlsmaster = read_tlsmaster(tlsmaster)
     else:
@@ -56,8 +57,12 @@ def convert(pcapfile, mitmfile, tlsmaster):
     reader.tcp = TCPPacketStreamer(reader, handlers)
     writer = FlowWriter(mitmfile)
 
-    # Sort the http/https requests and responses by their timestamp.
-    l = sorted(reader.process(), key=lambda x: x[1])
+
+    l = reader.process()
+    if not stream:
+        # Sort the http/https requests and responses by their timestamp.
+        l = sorted(l, key=lambda x: x[1])
+
     for addrs, timestamp, protocol, sent, recv in l:
         if protocol not in ("http", "https"):
             continue
