@@ -17,19 +17,15 @@ from httpreplay.cut import (
 from httpreplay.misc import read_tlsmaster
 
 try:
-    from libmproxy import models
-    from libmproxy.flow import FlowWriter
+    from mitmproxy import models
+    from mitmproxy.flow import FlowWriter
     from netlib.http import http1
+    from netlib.exceptions import HttpSyntaxException
 except ImportError:
-    try:
-        from mitmproxy import models
-        from mitmproxy.flow import FlowWriter
-        from netlib.http import http1
-    except ImportError:
-        sys.exit(
-            "In order to use this utility it is required to have the "
-            "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
-        )
+    sys.exit(
+        "In order to use this utility it is required to have the "
+        "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
+    )
 
 logging.basicConfig(level=logging.INFO)
 
@@ -86,8 +82,9 @@ def convert(pcapfile, mitmfile, tlsmaster, stream):
         if request_body_size > 0:
             request_body_size = -1
 
-        request.data.content = \
-            "".join(http1.read_body(req_io, request_body_size, None))
+        request.data.content, malformed = read_body(req_io, request_body_size)
+        if malformed:
+            request.headers["X-Mitmproxy-Malformed-Request-Body"] = "1"
 
         flow.request = models.HTTPRequest.wrap(request)
         flow.request.host, flow.request.port = dstip, dstport
@@ -100,12 +97,30 @@ def convert(pcapfile, mitmfile, tlsmaster, stream):
         if response_body_size > 0:
             response_body_size = -1
 
-        response.data.content = \
-            "".join(http1.read_body(resp_io, response_body_size, None))
+        response.data.content, malformed = read_body(resp_io, response_body_size)
+        if malformed:
+            response.headers["X-Mitmproxy-Malformed-Response-Body"] = "1"
 
         flow.response = models.HTTPResponse.wrap(response)
 
         writer.add(flow)
+
+def read_body(io, expected_size):
+    """
+    Read a (malformed) HTTP body.
+    Returns:
+        A (body: bytes, is_malformed: bool) tuple.
+    """
+    body_start = io.tell()
+    try:
+        content = b"".join(http1.read_body(io, expected_size, None))
+        if io.read():  # leftover?
+            raise HttpSyntaxException()
+        return content, False
+    except HttpSyntaxException:
+        io.seek(body_start)
+        return io.read(), True
+
 
 if __name__ == "__main__":
     convert()
