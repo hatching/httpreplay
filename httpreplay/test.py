@@ -259,24 +259,25 @@ def _pcap_2014_09_29(s, sent, recv):
 def test_suite():
     errors = 0
     for pcap in pcaps:
-        reader = httpreplay.reader.PcapReader(pcap["pcapfile"])
-        reader.tcp = \
-            httpreplay.smegma.TCPPacketStreamer(reader, pcap["handlers"])
+        with open(pcap["pcapfile"], "rb") as pcapfile:
+            reader = httpreplay.reader.PcapReader(pcapfile)
+            reader.tcp = \
+                httpreplay.smegma.TCPPacketStreamer(reader, pcap["handlers"])
 
-        count = 0
-        for s, ts, protocol, sent, recv in reader.process():
-            output = pcap["format"](s, ts, sent, recv)
-            if output not in pcap["output"]:
-                log.critical("Error in unittest output for %s: %s",
-                             pcap["pcapfile"], output)
-                errors += 1
-            count += 1
+            count = 0
+            for s, ts, protocol, sent, recv in reader.process():
+                output = pcap["format"](s, ts, sent, recv)
+                if output not in pcap["output"]:
+                    log.critical("Error in unittest output for %s: %s",
+                                 pcap["pcapfile"], output)
+                    errors += 1
+                count += 1
 
-        if pcap.get("output_count") and count != pcap["output_count"]:
-            log.critical(
-                "Incorrect output count determined for %s: %s instead of %s",
-                pcap["pcapfile"], count, pcap["output_count"]
-            )
+            if pcap.get("output_count") and count != pcap["output_count"]:
+                log.critical(
+                    "Incorrect output count determined for %s: %s instead of %s",
+                    pcap["pcapfile"], count, pcap["output_count"]
+                )
 
     log.info("Found %d errors.", errors)
     exit(1 if errors else 0)
