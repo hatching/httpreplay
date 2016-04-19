@@ -11,36 +11,35 @@ from httpreplay.shoddy import Protocol
 
 log = logging.getLogger(__name__)
 
+def _read_chunked(rfile):
+    """
+    Read a HTTP body with chunked transfer encoding.
+
+    (adapted from mitmproxy's netlib.http.http1)
+    """
+    while True:
+        line = rfile.readline(128)
+        if line == b"":
+            raise dpkt.NeedData("premature end of chunked body")
+        if line != b"\r\n" and line != b"\n":
+            try:
+                length = int(line, 16)
+            except ValueError:
+                raise dpkt.UnpackError("Invalid chunked encoding length: {}".format(line))
+            chunk = rfile.read(length)
+            suffix = rfile.readline(5)
+            if suffix != b"\r\n":
+                raise dpkt.UnpackError("Malformed chunked body")
+            if length == 0:
+                return
+            yield chunk
+
 def parse_body(f, headers):
     """Return HTTP body parsed from a file object, given HTTP header dict.
     This is a modified version of dpkt.http.parse_body() which tolerates cut
     off HTTP bodies."""
     if headers.get("transfer-encoding", "").lower() == "chunked":
-        l = []
-        found_end = False
-        while True:
-            line = f.readline()
-            if not line:
-                found_end = True
-
-            n = int(line.strip() or "0", 16)
-            if not n:
-                found_end = True
-
-            buf = f.read(n)
-            if f.readline().strip():
-                break
-
-            # TODO Should we continue stitching here or just leave it as is?
-            if n and len(buf) == n:
-                l.append(buf)
-            else:
-                break
-
-        if not found_end:
-            raise dpkt.NeedData("premature end of chunked body")
-
-        body = "".join(l)
+        body = "".join(_read_chunked(f))
     elif "content-length" in headers:
         n = int(headers["content-length"])
         body = f.read(n)
