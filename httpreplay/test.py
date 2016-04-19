@@ -6,9 +6,12 @@ import dpkt
 import hashlib
 import logging
 
+from io import BytesIO
+
 import httpreplay.reader
 
 from httpreplay.cut import dummy_handler, http_handler, forward_handler
+from httpreplay.cobweb import parse_body
 
 log = logging.getLogger(__name__)
 
@@ -280,3 +283,19 @@ def test_suite():
 
     log.info("Found %d errors.", errors)
     exit(1 if errors else 0)
+
+def test_read_chunked():
+
+    def parse(content):
+        try:
+            return parse_body(BytesIO(content),{"transfer-encoding": "chunked"})
+        except:
+            return False
+
+    assert parse(b"1\r\na\r\n0\r\n\r\n") == b"a"
+    assert parse(b"\r\n\r\n1\r\na\r\n1\r\nb\r\n0\r\n\r\n") == b"ab"
+
+    assert not parse(b"1\r\na\r\n0\r\n")
+    assert not parse(b"\r\n")
+    assert not parse(b"1\r\nfoo")
+    assert not parse(b"foo\r\nfoo")
