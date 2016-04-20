@@ -291,7 +291,10 @@ class TCPStream(Protocol):
 
         if (tcp.seq, tcp.ack) in self.origins:
             dup = self.packets.pop(self.origins.pop((tcp.seq, tcp.ack)))
-            log.warning(
+
+            # Only make it a warning when the packet size is actually
+            # different - same length packets doesn't matter much for us.
+            (log.warning if len(dup) != len(packet) else log.debug)(
                 "Found a retransmitted packet possibly with a different size "
                 "than the original packet: %s vs %s (timestamps %f vs %f)!",
                 len(dup), len(packet), dup.ts, packet.ts,
