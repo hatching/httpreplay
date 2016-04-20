@@ -1,47 +1,83 @@
-#!/usr/bin/env python
-# Copyright (C) 2016 Maximilian Hils <git@maximilianhils.com>
-# This file is part of HTTPReplay - http://jbremer.org/httpreplay/
-# See the file 'LICENSE' for copying permission.
-
-import click
 import logging
-import sys
-
 from io import BytesIO
 
-from httpreplay.reader import PcapReader
-from httpreplay.smegma import TCPPacketStreamer
+import click
+
 from httpreplay.cut import (
     http_handler, https_handler, smtp_handler
 )
+from httpreplay.reader import PcapReader
+from httpreplay.smegma import TCPPacketStreamer
 from httpreplay.misc import read_tlsmaster
 
-try:
-    from mitmproxy import models
-    from mitmproxy.flow import FlowWriter
-    from netlib.http import http1
-    from netlib.exceptions import HttpSyntaxException
-except ImportError:
-    sys.exit(
-        "In order to use this utility it is required to have the "
-        "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
-    )
-
 logging.basicConfig(level=logging.INFO)
+
+
+@click.command()
+@click.argument("pcapfile", type=click.File("rb"))
+@click.option("--tlsmaster", type=click.Path(file_okay=True), help="TLS master secrets file")
+def httpreplay(pcapfile, tlsmaster):
+
+    if tlsmaster:
+        tls_master_secrets = read_tlsmaster(tlsmaster)
+    else:
+        tls_master_secrets = {}
+
+    handlers = {
+        25: smtp_handler,
+        80: http_handler,
+        8000: http_handler,
+        8080: http_handler,
+        443: lambda: https_handler(tls_master_secrets),
+        4443: lambda: https_handler(tls_master_secrets),
+    }
+
+    reader = PcapReader(pcapfile)
+    reader.tcp = TCPPacketStreamer(reader, handlers)
+
+    for s, ts, protocol, sent, recv in reader.process():
+        print s, "%f" % ts, protocol, getattr(sent, "uri", None)
+
 
 @click.command()
 @click.argument("pcapfile", type=click.File("rb"))
 @click.argument("mitmfile", type=click.File("wb"))
 @click.option("--tlsmaster", type=click.Path(file_okay=True), help="TLS master secrets file")
 @click.option('--stream/--no-stream', default=False)
-def convert(pcapfile, mitmfile, tlsmaster, stream):
+def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
+    try:
+        from mitmproxy import models
+        from mitmproxy.flow import FlowWriter
+        from netlib.http import http1
+        from netlib.exceptions import HttpSyntaxException
+    except ImportError:
+        raise click.Abort(
+            "In order to use this utility it is required to have the "
+            "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
+        )
+
+    def read_body(io, expected_size):
+        """
+        Read a (malformed) HTTP body.
+        Returns:
+            A (body: bytes, is_malformed: bool) tuple.
+        """
+        body_start = io.tell()
+        try:
+            content = b"".join(http1.read_body(io, expected_size, None))
+            if io.read():  # leftover?
+                raise HttpSyntaxException()
+            return content, False
+        except HttpSyntaxException:
+            io.seek(body_start)
+            return io.read(), True
+
     if tlsmaster:
         tlsmaster = read_tlsmaster(tlsmaster)
     else:
         tlsmaster = {}
 
     handlers = {
-        25: smtp_handler,
         80: http_handler,
         8000: http_handler,
         8080: http_handler,
@@ -52,7 +88,6 @@ def convert(pcapfile, mitmfile, tlsmaster, stream):
     reader = PcapReader(pcapfile)
     reader.tcp = TCPPacketStreamer(reader, handlers)
     writer = FlowWriter(mitmfile)
-
 
     l = reader.process()
     if not stream:
@@ -104,23 +139,3 @@ def convert(pcapfile, mitmfile, tlsmaster, stream):
         flow.response = models.HTTPResponse.wrap(response)
 
         writer.add(flow)
-
-def read_body(io, expected_size):
-    """
-    Read a (malformed) HTTP body.
-    Returns:
-        A (body: bytes, is_malformed: bool) tuple.
-    """
-    body_start = io.tell()
-    try:
-        content = b"".join(http1.read_body(io, expected_size, None))
-        if io.read():  # leftover?
-            raise HttpSyntaxException()
-        return content, False
-    except HttpSyntaxException:
-        io.seek(body_start)
-        return io.read(), True
-
-
-if __name__ == "__main__":
-    convert()
