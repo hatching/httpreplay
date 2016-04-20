@@ -273,6 +273,8 @@ pcaps = [
 ]
 
 def test_suite():
+    test_read_chunked()
+
     errors = 0
     for pcap in pcaps:
         reader = httpreplay.reader.PcapReader(pcap["pcapfile"])
@@ -298,10 +300,10 @@ def test_suite():
     exit(1 if errors else 0)
 
 def test_read_chunked():
-
     def parse(content):
         try:
-            return parse_body(BytesIO(content),{"transfer-encoding": "chunked"})
+            headers = {"transfer-encoding": "chunked"}
+            return parse_body(BytesIO(content), headers)
         except:
             return False
 
