@@ -26,7 +26,10 @@ setup(
     ],
     extras_require={
         "mitmproxy": [
-            "mitmproxy>=0.16",
+            "mitmproxy>=0.17",
         ],
+        "dev": [
+            "pytest>=2.9.1"
+        ]
     },
 )
