@@ -7,9 +7,11 @@ from httpreplay.cut import (
     http_handler, https_handler, smtp_handler
 )
 from httpreplay.reader import PcapReader
-from httpreplay.smegma import TCPPacketStreamer
+from httpreplay.smegma import TCPPacketStreamer, TLSStream
 from httpreplay.misc import read_tlsmaster
+from httpreplay.shoddy import Protocol
 
+log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 
@@ -49,40 +51,96 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
         from mitmproxy import models
         from mitmproxy.flow import FlowWriter
         from netlib.http import http1
-        from netlib.exceptions import HttpSyntaxException
+        from netlib.exceptions import HttpException
     except ImportError:
         raise click.Abort(
             "In order to use this utility it is required to have the "
             "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
         )
 
-    def read_body(io, expected_size):
+    class NetlibHttpProtocol(Protocol):
         """
-        Read a (malformed) HTTP body.
-        Returns:
-            A (body: bytes, is_malformed: bool) tuple.
+        Like HttpProtocol, but actually covering edge-cases.
         """
-        body_start = io.tell()
-        try:
-            content = b"".join(http1.read_body(io, expected_size, None))
-            if io.read():  # leftover?
-                raise HttpSyntaxException()
-            return content, False
-        except HttpSyntaxException:
-            io.seek(body_start)
-            return io.read(), True
+
+        @staticmethod
+        def read_body(io, expected_size):
+            """
+            Read a (malformed) HTTP body.
+            Returns:
+                A (body: bytes, is_malformed: bool) tuple.
+            """
+            body_start = io.tell()
+            try:
+                content = b"".join(http1.read_body(io, expected_size, None))
+                if io.read():  # leftover?
+                    raise HttpException()
+                return content, False
+            except HttpException:
+                io.seek(body_start)
+                return io.read(), True
+
+        def parse_request(self, ts, sent):
+            try:
+                sent = BytesIO(sent)
+                request = http1.read_request_head(sent)
+                body_size = http1.expected_http_body_size(request)
+                request.data.content, malformed = self.read_body(sent, body_size)
+                if malformed:
+                    request.headers["X-Mitmproxy-Malformed-Body"] = "1"
+                return request
+            except HttpException as e:
+                log.warning("{!r} (timestamp: {})".format(e, ts))
+
+        def parse_response(self, ts, recv, request):
+            try:
+                recv = BytesIO(recv)
+                response = http1.read_response_head(recv)
+                body_size = http1.expected_http_body_size(request, response)
+                response.data.content, malformed = self.read_body(recv, body_size)
+                if malformed:
+                    response.headers["X-Mitmproxy-Malformed-Body"] = "1"
+                return response
+            except HttpException as e:
+                log.warning("{!r} (timestamp: {})".format(e, ts))
+
+        def handle(self, s, ts, protocol, sent, recv):
+            if protocol not in ("tcp", "tls"):
+                self.parent.handle(s, ts, protocol, sent, recv)
+                return
+
+            req = None
+            if sent:
+                req = self.parse_request(ts, sent)
+
+            protocols = {
+                "tcp": "http",
+                "tls": "https",
+            }
+
+            # Only try to decode the HTTP response if the request was valid HTTP.
+            if req:
+                res = self.parse_response(ts, recv, req)
+
+                # Report this stream as being a valid HTTP stream.
+                self.parent.handle(s, ts, protocols[protocol],
+                                   req or sent, res)
+            else:
+                # This wasn't a valid HTTP stream so we forward the original TCP
+                # or TLS stream straight ahead to our parent.
+                self.parent.handle(s, ts, protocol, sent, recv)
 
     if tlsmaster:
         tlsmaster = read_tlsmaster(tlsmaster)
     else:
         tlsmaster = {}
 
+    netlib_http_handler = lambda: NetlibHttpProtocol()
+    netlib_https_handler = lambda: TLSStream(NetlibHttpProtocol(), tlsmaster)
     handlers = {
-        80: http_handler,
-        8000: http_handler,
-        8080: http_handler,
-        443: lambda: https_handler(tlsmaster),
-        4443: lambda: https_handler(tlsmaster),
+        443: netlib_https_handler,
+        4443: netlib_https_handler,
+        'generic': netlib_http_handler,
     }
 
     reader = PcapReader(pcapfile)
@@ -108,34 +166,10 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
 
         flow = models.HTTPFlow(client_conn, server_conn)
 
-        # We need to manually read request and response bodies as the PCAP may
-        # be incomplete and we'd complain on an unexpected body length.
-        req_io = BytesIO(sent.raw)
-        request = http1.read_request_head(req_io)
-        request_body_size = http1.expected_http_body_size(request)
-
-        if request_body_size > 0:
-            request_body_size = -1
-
-        request.data.content, malformed = read_body(req_io, request_body_size)
-        if malformed:
-            request.headers["X-Mitmproxy-Malformed-Request-Body"] = "1"
-
-        flow.request = models.HTTPRequest.wrap(request)
+        flow.request = models.HTTPRequest.wrap(sent)
         flow.request.host, flow.request.port = dstip, dstport
         flow.request.scheme = protocol
-
-        resp_io = BytesIO(recv.raw)
-        response = http1.read_response_head(resp_io)
-        response_body_size = http1.expected_http_body_size(request, response)
-
-        if response_body_size > 0:
-            response_body_size = -1
-
-        response.data.content, malformed = read_body(resp_io, response_body_size)
-        if malformed:
-            response.headers["X-Mitmproxy-Malformed-Response-Body"] = "1"
-
-        flow.response = models.HTTPResponse.wrap(response)
+        if recv:
+            flow.response = models.HTTPResponse.wrap(recv)
 
         writer.add(flow)

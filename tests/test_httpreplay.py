@@ -266,6 +266,26 @@ class TestCaptureNotAcked2(_TestPcap):
     )
 
 
+class TestWeirdRetransmission(_TestPcap):
+    """Packet 15 retransmits the tail of packet 11"""
+    pcapfile = "2016-04-20-docker.pcap"
+
+    handlers = {
+        8080: http_handler
+    }
+
+    def format(self, s, ts, p, sent, recv):
+        return getattr(sent, "uri", sent)
+
+    expected_output = [
+        "/jmx-console/",
+        "/jmx-console/filterView.jsp",
+        "/jmx-console/images/newlogo.gif",
+        "/favicon.ico",
+        "\x00\x00\x00\x00\x00"
+    ]
+
+
 def test_read_chunked():
     def parse(content):
         try:
