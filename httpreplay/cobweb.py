@@ -162,7 +162,7 @@ class HttpProtocol(Protocol):
         }
 
         # Only try to decode the HTTP response if the request was valid HTTP.
-        if req and recv:
+        if req:
             res = self.parse_response(ts, recv)
 
             # Report this stream as being a valid HTTP stream.

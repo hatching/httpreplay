@@ -19,8 +19,7 @@ def _pcap_test_pcap(s, ts, p, sent, recv):
     return ts, sent.uri, len(recv.body or "")
 
 def _pcap_2014_08_13(s, ts, p, sent, recv):
-    if p == "http":
-        return sent.method, sent.uri, recv
+    return sent.method, sent.uri, recv.raw
 
 def _pcap_2014_08_13_2(s, ts, p, sent, recv):
     return s[0], sent, recv
