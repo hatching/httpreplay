@@ -52,6 +52,9 @@ def _pcap_2014_09_29(s, ts, p, sent, recv):
     if isinstance(recv, dpkt.http.Response):
         return hashlib.md5(recv.body).hexdigest()
 
+def _pcap_invalidtcppacketorder(s, ts, p, sent, recv):
+    return len(sent.raw), len(recv.raw)
+
 pcaps = [
     {
         "handlers": {
@@ -267,6 +270,18 @@ pcaps = [
             "07a37ca8f8898d5e1d8041ca37e8b399",
             "d41d8cd98f00b204e9800998ecf8427e",
             None,
+        ],
+    },
+    {
+        "handlers": {
+            80: http_handler,
+        },
+        "pcapfile": "pcaps/invalidtcppacketorder.pcap",
+        "description": "Tests InvalidTcpPacketOrder exception",
+        "format": _pcap_invalidtcppacketorder,
+        "output_count": 1,
+        "output": [
+            (97, 179),
         ],
     },
 ]

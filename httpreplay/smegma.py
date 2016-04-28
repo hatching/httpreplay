@@ -143,7 +143,7 @@ class TCPStream(Protocol):
 
         # The reply from a server when no service is listening on the given
         # port. Generally speaking the client will retry sending SYN packets.
-        if not to_server and tcp.flags & dpkt.tcp.TH_RST:
+        if tcp.flags & dpkt.tcp.TH_RST:
             # self.parent.handle(self.s, ts, None, None, special="deadhost")
             self.state = "init_syn"
             return
