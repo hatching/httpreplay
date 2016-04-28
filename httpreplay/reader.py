@@ -16,13 +16,13 @@ class PcapReader(object):
     having each packet processed by the various callback functions that can be
     provided by the user."""
 
-    def __init__(self, filepath):
+    def __init__(self, fp):
         self.tcp = None
         self.udp = None
         self.values = []
 
         try:
-            self.pcap = dpkt.pcap.Reader(open(filepath, "rb"))
+            self.pcap = dpkt.pcap.Reader(fp)
         except ValueError as e:
             if e.message == "invalid tcpdump header":
                 log.critical("Currently we don't support PCAP-NG files")
