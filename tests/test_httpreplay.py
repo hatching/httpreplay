@@ -299,7 +299,7 @@ class TestClientSideInvalidTcpPacketOrder(_TestPcap):
         return len(sent.raw), len(recv.raw)
 
     expected_output = [
-        (79, 179),
+        (97, 179),
     ]
 
 
