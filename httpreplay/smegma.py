@@ -215,8 +215,8 @@ class TCPStream(Protocol):
             return
 
         # It is possible that a client sends out a request straight away along
-        # with the ACK packet (in case the PUSH flag is set?)
-        if tcp.flags == (dpkt.tcp.TH_PUSH | dpkt.tcp.TH_ACK) and tcp.data:
+        # with the ACK packet (the push flag might also be set)
+        if tcp.flags & dpkt.tcp.TH_ACK and tcp.data:
             self.state = "conn"
             self.state_conn(ts, tcp, to_server)
             return
@@ -289,8 +289,12 @@ class TCPStream(Protocol):
         packet = Packet(tcp.data)
         packet.ts = ts
 
-        if (tcp.seq, tcp.ack) in self.origins:
-            dup = self.packets.pop(self.origins.pop((tcp.seq, tcp.ack)))
+        if (tcp.seq, tcp.ack) in self.origins or (tcp_seq, tcp.ack) in self.packets:
+            # We do not want to prefer the retransmission here (?)
+            if (tcp_seq, tcp.ack) in self.packets:
+                dup = self.packets[tcp_seq, tcp.ack]
+            else:
+                dup = self.packets[self.origins[tcp.seq, tcp.ack]]
 
             # Only make it a warning when the packet size is actually
             # different - same length packets doesn't matter much for us.
@@ -299,9 +303,9 @@ class TCPStream(Protocol):
                 "than the original packet: %s vs %s (timestamps %f vs %f)!",
                 len(dup), len(packet), dup.ts, packet.ts,
             )
-
-        self.origins[tcp.seq, tcp.ack] = tcp_seq, tcp.ack
-        self.packets[tcp_seq, tcp.ack] = packet
+        else:
+            self.origins[tcp.seq, tcp.ack] = tcp_seq, tcp.ack
+            self.packets[tcp_seq, tcp.ack] = packet
 
     def state_conn_closed(self, ts, tcp, to_server):
         # Enqueue this packet if any is provided.
