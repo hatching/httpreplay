@@ -29,7 +29,7 @@ setup(
         ]
     },
     entry_points={
-        'console_scripts': [
+        "console_scripts": [
             "httpreplay = httpreplay.main:httpreplay",
             "pcap2mitm = httpreplay.main:pcap2mitm",
         ]

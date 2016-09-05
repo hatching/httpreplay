@@ -597,9 +597,9 @@ class TLSStream(Protocol):
 _cs = tlslite.constants.CipherSuite
 if 0xc009 not in _cs.ietfNames:
     _cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA = 0xC009
-    _cs.ietfNames[0xC009] = 'TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA'
+    _cs.ietfNames[0xC009] = "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"
     _cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA = 0xC00A
-    _cs.ietfNames[0xC00A] = 'TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA'
+    _cs.ietfNames[0xC00A] = "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"
     _cs.aes128Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
     _cs.aes256Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
     _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)

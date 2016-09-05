@@ -45,7 +45,7 @@ def httpreplay(pcapfile, tlsmaster):
 @click.argument("pcapfile", type=click.File("rb"))
 @click.argument("mitmfile", type=click.File("wb"))
 @click.option("--tlsmaster", type=click.Path(file_okay=True), help="TLS master secrets file")
-@click.option('--stream/--no-stream', default=False)
+@click.option("--stream/--no-stream", default=False)
 def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
     try:
         from mitmproxy import models
@@ -140,7 +140,7 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
     handlers = {
         443: netlib_https_handler,
         4443: netlib_https_handler,
-        'generic': netlib_http_handler,
+        "generic": netlib_http_handler,
     }
 
     reader = PcapReader(pcapfile)
