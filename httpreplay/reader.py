@@ -21,7 +21,7 @@ class PcapReader(object):
         self.udp = None
         self.values = []
 
-        # Backwards compatibilty with httpreplay<=0.1.11.
+        # Backwards compatibilty with httpreplay<=0.1.14.
         if isinstance(fp_or_filepath, basestring):
             fp_or_filepath = open(fp_or_filepath, "rb")
 
