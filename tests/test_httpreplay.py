@@ -325,3 +325,8 @@ def test_read_chunked():
     assert not parse(b"\r\n")
     assert not parse(b"1\r\nfoo")
     assert not parse(b"foo\r\nfoo")
+
+def test_init_reader():
+    a = httpreplay.reader.PcapReader("tests/pcaps/test.pcap")
+    b = httpreplay.reader.PcapReader(open("tests/pcaps/test.pcap", "rb"))
+    assert list(a.pcap) == list(b.pcap)
