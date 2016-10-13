@@ -7,7 +7,7 @@ from setuptools import setup
 
 setup(
     name="HTTPReplay",
-    version="0.1.15",
+    version="0.1.16a1",
     author="Jurriaan Bremer",
     author_email="jbr@cuckoo.sh",
     packages=[
