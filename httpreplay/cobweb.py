@@ -1,4 +1,4 @@
-# Copyright (C) 2015 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -120,7 +120,7 @@ class HttpProtocol(Protocol):
 
             # Decode the content encoding.
             content_encoding = res.headers.get("content-encoding")
-            if content_encoding:
+            if content_encoding and res.body:
                 if content_encoding not in content_encodings:
                     raise UnknownHttpEncoding(content_encoding)
 

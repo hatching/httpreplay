@@ -331,6 +331,29 @@ class TestTLSWithRC4(_TestPcap):
         "/iam.js",
     ]
 
+class TestNoGzipBody(_TestPcap):
+    pcapfile = "nogzipbody.pcap"
+    expected_output = []
+
+    def _https_handler():
+        session_id = "479ef8a88198b5b3f7e5b8bf79dea2d0635300ad744de08deb4e83610c5227e9"
+        master_key = "25fba9ac38b8750ead7b9ba50aba06e12aa566ffa0c3fa24cbdaf638711b8458da84cd79e9b32f4025a858a5c106c7a5"
+        return https_handler({
+            session_id.decode("hex"): master_key.decode("hex"),
+        })
+
+    def format(self, s, ts, p, sent, recv):
+        return getattr(sent, "uri", sent)
+
+    handlers = {
+        443: _https_handler,
+    }
+
+    expected_output = [
+        "/js/ho/link_inline_images.min.js",
+        "/fonts/source-sans-pro-subset/sourcesanspro-regular-webfont.eot?",
+        "/fonts/gidole/gidole-regular-webfont.eot?",
+    ]
 
 def test_read_chunked():
     def parse(content):
