@@ -1,20 +1,18 @@
-# Copyright (C) 2015 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
-import os
-
-import pytest
 
 import dpkt
 import hashlib
+import io
 import logging
-
-from io import BytesIO
-
-import httpreplay.reader
+import os
+import pytest
 
 from httpreplay.cut import dummy_handler, http_handler, forward_handler
 from httpreplay.cobweb import parse_body
+from httpreplay.reader import PcapReader
+from httpreplay.smegma import TCPPacketStreamer
 
 log = logging.getLogger(__name__)
 
@@ -34,8 +32,8 @@ class _TestPcap:
 
     def test_pcap(self):
         with open(os.path.join(here, "pcaps", self.pcapfile), "rb") as f:
-            reader = httpreplay.reader.PcapReader(f)
-            reader.tcp = httpreplay.smegma.TCPPacketStreamer(reader, self.handlers)
+            reader = PcapReader(f)
+            reader.tcp = TCPPacketStreamer(reader, self.handlers)
 
             output = [
                 self.format(*stream)
@@ -314,7 +312,7 @@ def test_read_chunked():
     def parse(content):
         try:
             headers = {"transfer-encoding": "chunked"}
-            return parse_body(BytesIO(content), headers)
+            return parse_body(io.BytesIO(content), headers)
         except:
             return False
 
@@ -327,6 +325,6 @@ def test_read_chunked():
     assert not parse(b"foo\r\nfoo")
 
 def test_init_reader():
-    a = httpreplay.reader.PcapReader("tests/pcaps/test.pcap")
-    b = httpreplay.reader.PcapReader(open("tests/pcaps/test.pcap", "rb"))
+    a = PcapReader("tests/pcaps/test.pcap")
+    b = PcapReader(open("tests/pcaps/test.pcap", "rb"))
     assert list(a.pcap) == list(b.pcap)

@@ -1,4 +1,4 @@
-# Copyright (C) 2015 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -7,11 +7,10 @@ import logging
 import socket
 import tlslite
 
-from httpreplay.shoddy import Protocol
-
 from httpreplay.exceptions import (
     UnknownTcpSequenceNumber, UnexpectedTcpData, InvalidTcpPacketOrder,
 )
+from httpreplay.shoddy import Protocol
 
 log = logging.getLogger(__name__)
 

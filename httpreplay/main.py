@@ -1,19 +1,21 @@
-import logging
-from io import BytesIO
+# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
+# This file is part of HTTPReplay - http://jbremer.org/httpreplay/
+# See the file 'LICENSE' for copying permission.
 
 import click
+import io
+import logging
 
 from httpreplay.cut import (
     http_handler, https_handler, smtp_handler
 )
-from httpreplay.reader import PcapReader
-from httpreplay.smegma import TCPPacketStreamer, TLSStream
 from httpreplay.misc import read_tlsmaster
+from httpreplay.reader import PcapReader
 from httpreplay.shoddy import Protocol
+from httpreplay.smegma import TCPPacketStreamer, TLSStream
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
-
 
 @click.command()
 @click.argument("pcapfile", type=click.File("rb"))
@@ -39,7 +41,6 @@ def httpreplay(pcapfile, tlsmaster):
 
     for s, ts, protocol, sent, recv in reader.process():
         print s, "%f" % ts, protocol, getattr(sent, "uri", None)
-
 
 @click.command()
 @click.argument("pcapfile", type=click.File("rb"))
@@ -82,7 +83,7 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
 
         def parse_request(self, ts, sent):
             try:
-                sent = BytesIO(sent)
+                sent = io.BytesIO(sent)
                 request = http1.read_request_head(sent)
                 body_size = http1.expected_http_body_size(request)
                 request.data.content, malformed = self.read_body(sent, body_size)
@@ -94,7 +95,7 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
 
         def parse_response(self, ts, recv, request):
             try:
-                recv = BytesIO(recv)
+                recv = io.BytesIO(recv)
                 response = http1.read_response_head(recv)
                 body_size = http1.expected_http_body_size(request, response)
                 response.data.content, malformed = self.read_body(recv, body_size)
