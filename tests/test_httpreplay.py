@@ -9,7 +9,9 @@ import logging
 import os
 import pytest
 
-from httpreplay.cut import dummy_handler, http_handler, forward_handler
+from httpreplay.cut import (
+    dummy_handler, http_handler, forward_handler, https_handler
+)
 from httpreplay.cobweb import parse_body
 from httpreplay.reader import PcapReader
 from httpreplay.smegma import TCPPacketStreamer
@@ -305,6 +307,28 @@ class TestClientSideInvalidTcpPacketOrder(_TestPcap):
 
     expected_output = [
         (97, 179),
+    ]
+
+
+class TestTLSWithRC4(_TestPcap):
+    pcapfile = "stream11.pcap"
+
+    def _https_handler():
+        session_id = "5ab7c9537928268ba71cd5fc790b6accb29707cfa7b3f85347e432a439eb1b4b"
+        master_key = "50321cf5552ba2f3ed34cd6eee005cf6490f5d915c7db8e2cfbf54940140308aa09c0a4e94107df6b25d2509f5bf0f13"
+        return https_handler({
+            session_id.decode("hex"): master_key.decode("hex"),
+        })
+
+    handlers = {
+        443: _https_handler,
+    }
+
+    def format(self, s, ts, p, sent, recv):
+        return getattr(sent, "uri", sent)
+
+    expected_output = [
+        "/iam.js",
     ]
 
 

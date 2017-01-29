@@ -413,13 +413,22 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         self.client_cipher = self._recordLayer._pendingWriteState
         return True
 
+    def decrypt(self, state, record_type, buf):
+        self._recordLayer._readState = state
+        if state.encContext.isBlockCipher:
+            return str(self._recordLayer._decryptThenMAC(
+                record_type, bytearray(buf)
+            ))
+        else:
+            return str(self._recordLayer._decryptStreamThenMAC(
+                record_type, bytearray(buf)
+            ))
+
     def decrypt_server(self, record_type, buf):
-        self._recordLayer._readState = self.server_cipher
-        return str(self._recordLayer._decryptThenMAC(record_type, bytearray(buf)))
+        return self.decrypt(self.server_cipher, record_type, buf)
 
     def decrypt_client(self, record_type, buf):
-        self._recordLayer._readState = self.client_cipher
-        return str(self._recordLayer._decryptThenMAC(record_type, bytearray(buf)))
+        return self.decrypt(self.client_cipher, record_type, buf)
 
 class TLSStream(Protocol):
     """Decrypts TLS streams into a TCPStream-like session."""
