@@ -15,6 +15,9 @@ from httpreplay.cut import (
 from httpreplay.cobweb import parse_body
 from httpreplay.reader import PcapReader
 from httpreplay.smegma import TCPPacketStreamer
+from httpreplay.exceptions import (
+    UnknownEthernetProtocol, UnknownIpProtocol, UnknownDatalink
+)
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +31,8 @@ class _TestPcap:
     pcapfile = ""
     expected_output = None
 
+    use_exceptions = True
+
     @staticmethod
     def format(self, s, ts, p, sent, recv):
         raise NotImplementedError()
@@ -37,11 +42,14 @@ class _TestPcap:
             reader = PcapReader(f)
             reader.tcp = TCPPacketStreamer(reader, self.handlers)
 
+            reader.raise_exceptions = self.use_exceptions
+
             output = [
                 self.format(*stream)
                 for stream in reader.process()
             ]
-            assert self.expected_output == output
+
+        assert self.expected_output == output
 
 
 class TestSimple(_TestPcap):
