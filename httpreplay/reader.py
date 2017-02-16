@@ -4,6 +4,7 @@
 
 import dpkt
 import logging
+import traceback
 
 from httpreplay.exceptions import (
     UnknownDatalink, UnknownEthernetProtocol, UnknownIpProtocol,
@@ -20,6 +21,12 @@ class PcapReader(object):
         self.tcp = None
         self.udp = None
         self.values = []
+
+        # Disables exceptions raised by PcapReader while the pcap is being
+        # read. If disabled, the exceptions are stored in the self.exceptions
+        # attribute
+        self.raise_exceptions = True
+        self.exceptions = {}
 
         # Backwards compatibilty with httpreplay<=0.1.14.
         if isinstance(fp_or_filepath, basestring):
@@ -57,8 +64,15 @@ class PcapReader(object):
                     packet = self._parse_ethernet(packet)
                 elif self.pcap.datalink() == 101:
                     packet = dpkt.ip.IP(packet)
-                else:
+                elif self.raise_exceptions:
                     raise UnknownDatalink(packet)
+                else:
+                    self.exceptions[ts] = {
+                        "exception": UnknownDatalink,
+                        "data": packet,
+                        "trace": traceback.extract_stack()
+                    }
+                    continue
 
             if isinstance(packet, dpkt.ethernet.Ethernet):
                 if isinstance(packet.data, dpkt.ip.IP):
@@ -67,8 +81,15 @@ class PcapReader(object):
                     packet = packet.data
                 elif isinstance(packet.data, dpkt.arp.ARP):
                     packet = packet.data
-                else:
+                elif self.raise_exceptions:
                     raise UnknownEthernetProtocol(packet)
+                else:
+                    self.exceptions[ts] = {
+                        "exception": UnknownEthernetProtocol,
+                        "data": packet,
+                        "trace": traceback.extract_stack()
+                    }
+                    continue
 
             if isinstance(packet, dpkt.ip.IP):
                 ip = packet
@@ -80,8 +101,16 @@ class PcapReader(object):
                     packet = packet.data
                 elif packet.p == dpkt.ip.IP_PROTO_IGMP:
                     continue
-                else:
+                elif self.raise_exceptions:
                     raise UnknownIpProtocol(packet)
+                else:
+                    self.exceptions[ts] = {
+                        "exception": UnknownIpProtocol,
+                        "data": packet,
+                        "trace": traceback.extract_stack()
+                    }
+                    continue
+
             else:
                 ip = None
 
