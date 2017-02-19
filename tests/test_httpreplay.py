@@ -21,10 +21,7 @@ from httpreplay.exceptions import (
 
 log = logging.getLogger(__name__)
 
-here = os.path.abspath(os.path.dirname(__file__))
-
-
-class _TestPcap:
+class PcapTest(object):
     handlers = {
         80: http_handler,
     }
@@ -38,7 +35,7 @@ class _TestPcap:
         raise NotImplementedError()
 
     def test_pcap(self):
-        with open(os.path.join(here, "pcaps", self.pcapfile), "rb") as f:
+        with open(os.path.join("tests", "pcaps", self.pcapfile), "rb") as f:
             reader = PcapReader(f)
             reader.tcp = TCPPacketStreamer(reader, self.handlers)
 
@@ -51,8 +48,7 @@ class _TestPcap:
 
         assert self.expected_output == output
 
-
-class TestSimple(_TestPcap):
+class TestSimple(PcapTest):
     """"Tests TCP reassembly and basic HTTP extraction"""
     pcapfile = "test.pcap"
 
@@ -70,8 +66,7 @@ class TestSimple(_TestPcap):
         (1278472581.580736, "/sd/logo2.png", 0),
     ]
 
-
-class TestNoResponse(_TestPcap):
+class TestNoResponse(PcapTest):
     """Extracts HTTP requests which have no response"""
     pcapfile = "2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap"
 
@@ -83,8 +78,7 @@ class TestNoResponse(_TestPcap):
         ("GET", "/cmd.php", ""),
     ]
 
-
-class TestEmptyRequest(_TestPcap):
+class TestEmptyRequest(PcapTest):
     """Handle client disconnect and empty request"""
     pcapfile = "2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap"
 
@@ -101,8 +95,7 @@ class TestEmptyRequest(_TestPcap):
         ("172.16.165.133", "", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
     ]
 
-
-class TestCutoff(_TestPcap):
+class TestCutoff(PcapTest):
     """Extracts HTTP response cut off during transmission"""
     pcapfile = "2014-12-13-download.pcap"
 
@@ -113,9 +106,8 @@ class TestCutoff(_TestPcap):
         ("/zp/zp-core/zp-extensions/tiny_mce/plugins/ajaxfilemanager/inc/main.php", 451729, 35040),
     ]
 
-
 # FIXME: This fails for some reason?
-class TestRetransmission(_TestPcap):
+class TestRetransmission(PcapTest):
     """Handles TCP Retransmission logic"""
 
     pcapfile = "2015-01-02-post-infection.pcap"
@@ -148,8 +140,7 @@ class TestRetransmission(_TestPcap):
         (("192.168.138.163", 49220, "24.253.145.21", 48754), "TCPRetransmission"),
     ]
 
-
-class TestSpuriousRetransmission(_TestPcap):
+class TestSpuriousRetransmission(PcapTest):
     """Handles TCP Spurious Retransmission logic"""
     pcapfile = "2015-10-08-Nuclear-EK-example-2-traffic.pcap"
 
@@ -174,8 +165,7 @@ class TestSpuriousRetransmission(_TestPcap):
         "/file.htm",
     ]
 
-
-class TestIgmpAndHttp(_TestPcap):
+class TestIgmpAndHttp(PcapTest):
     """Handle IGMP packets and HTTP on port 80"""
     pcapfile = "2015-10-13-Neutrino-EK-traffic-second-run.pcap"
 
@@ -192,8 +182,7 @@ class TestIgmpAndHttp(_TestPcap):
         [("POST", "/forum/db.php")] * 2
     )
 
-
-class TestHttpNoDefaultPort(_TestPcap):
+class TestHttpNoDefaultPort(PcapTest):
     """Handle HTTP on non-default ports"""
     pcapfile = "2015-10-13-Neutrino-EK-traffic-second-run.pcap"
 
@@ -212,8 +201,7 @@ class TestHttpNoDefaultPort(_TestPcap):
         ("GET", "/august/Z250anJ5dGRq"),
     ]
 
-
-class TestCaptureNotAcked(_TestPcap):
+class TestCaptureNotAcked(PcapTest):
     """Extracts HTTP requests which are not acknowledged"""
     pcapfile = "2015-10-12-Angler-EK-sends-Bedep-traffic.pcap"
 
@@ -233,7 +221,8 @@ class TestCaptureNotAcked(_TestPcap):
         "e4407e614445327e4edb836494cc4ef0", "cd9a2f577b63f7d9fd8d2bedcdd54bcd",
         "2c9e9b8a0e386e8db34827697160ec04", "1d67074ab1e6d3589da716a32fff6002",
         "0f3427e4788f146600121d1e64b7b00d", "a95fa6ffd78ab2a44ace57fa183b9d1f",
-        None, "d41d8cd98f00b204e9800998ecf8427e", "eed8ec65a6dd9b05eed6d4a02e1439e4",
+        None,
+        "d41d8cd98f00b204e9800998ecf8427e", "eed8ec65a6dd9b05eed6d4a02e1439e4",
         "1d260bbdbdf8ae67145134958e5fd864", "d41d8cd98f00b204e9800998ecf8427e",
         "89205cebf4c75c8e70d896e3803c3fb8", "cbb2bbdd3458221e9b51a20763f751c0",
         "a7b807ebdb3843e2a3db757b5785792e", "28f06d78a5568dc4c2c9149682b67fa8",
@@ -252,8 +241,7 @@ class TestCaptureNotAcked(_TestPcap):
         "f3856d13d9d3d951d2e1856661345cf5"
     ]
 
-
-class TestCaptureNotAcked2(_TestPcap):
+class TestCaptureNotAcked2(PcapTest):
     """Extracts HTTP requests which are not acknowledged"""
     pcapfile = "EK_MALWARE_2014-09-29-Nuclear-EK-traffic_mailware-traffic-analysis.net.pcap"
 
@@ -281,8 +269,7 @@ class TestCaptureNotAcked2(_TestPcap):
         [None] * 40
     )
 
-
-class TestWeirdRetransmission(_TestPcap):
+class TestWeirdRetransmission(PcapTest):
     """Packet 15 retransmits the tail of packet 11"""
     pcapfile = "2016-04-20-docker.pcap"
 
@@ -301,8 +288,7 @@ class TestWeirdRetransmission(_TestPcap):
         "\x00\x00\x00\x00\x00"
     ]
 
-
-class TestClientSideInvalidTcpPacketOrder(_TestPcap):
+class TestClientSideInvalidTcpPacketOrder(PcapTest):
     """Client side InvalidTcpPacketOrder exception."""
     pcapfile = "invalidtcppacketorder.pcap"
 
@@ -317,8 +303,7 @@ class TestClientSideInvalidTcpPacketOrder(_TestPcap):
         (97, 179),
     ]
 
-
-class TestTLSWithRC4(_TestPcap):
+class TestTLSWithRC4(PcapTest):
     pcapfile = "stream11.pcap"
 
     def _https_handler():
@@ -339,7 +324,7 @@ class TestTLSWithRC4(_TestPcap):
         "/iam.js",
     ]
 
-class TestNoGzipBody(_TestPcap):
+class TestNoGzipBody(PcapTest):
     pcapfile = "nogzipbody.pcap"
     expected_output = []
 
