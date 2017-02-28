@@ -6,13 +6,12 @@ import binascii
 import logging
 import re
 import zlib
-
 import dpkt
+
 from httpreplay.exceptions import UnknownHttpEncoding
 from httpreplay.shoddy import Protocol
 
 log = logging.getLogger(__name__)
-
 
 def _read_chunked(rfile):
     """
@@ -29,7 +28,8 @@ def _read_chunked(rfile):
                 length = int(line, 16)
             except ValueError:
                 raise dpkt.UnpackError(
-                    "Invalid chunked encoding length: {}".format(line))
+                    "Invalid chunked encoding length: %s" % line
+                )
             chunk = rfile.read(length)
             suffix = rfile.readline(5)
             if suffix != b"\r\n":
@@ -37,7 +37,6 @@ def _read_chunked(rfile):
             if length == 0:
                 return
             yield chunk
-
 
 def parse_body(f, headers):
     """Return HTTP body parsed from a file object, given HTTP header dict.
@@ -58,11 +57,9 @@ def parse_body(f, headers):
 
     return body
 
-
 # We override the standard dpkt.http.parse_body() method with one that
 # tolerates cut off HTTP bodies slightly better.
 dpkt.http.parse_body = parse_body
-
 
 def decode_gzip(ts, content):
     """Decompress HTTP gzip content, http://stackoverflow.com/a/2695575."""
@@ -76,7 +73,6 @@ def decode_gzip(ts, content):
                 "stitching TCP/IP packets back together (timestamp %f).", ts
             )
 
-
 def decode_pack200_gzip(ts, content):
     """Decompress HTTP pack200/gzip content, a gzip-compressed compressed
     JAR file.."""
@@ -85,16 +81,13 @@ def decode_pack200_gzip(ts, content):
         "response but this has not been implemented yet (timestamp %f).", ts
     )
 
-
 def decode_none(ts, content):
     """None encoding."""
     return content
 
-
 def decode_identity(ts, content):
     """Identity encoding, an encoding that doesn't change the content."""
     return content
-
 
 content_encodings = {
     "gzip": decode_gzip,
@@ -103,14 +96,12 @@ content_encodings = {
     "identity": decode_identity,
 }
 
-
 class _Response(object):
     """Dummy HTTP response object which only has the raw paremeter set."""
 
     def __init__(self, raw):
         self.raw = raw
         self.body = None
-
 
 class HttpProtocol(Protocol):
     """Interprets the TCP or TLS stream as HTTP request and response."""
@@ -187,30 +178,48 @@ class HttpProtocol(Protocol):
             # or TLS stream straight ahead to our parent.
             self.parent.handle(s, ts, protocol, sent, recv)
 
-
 class SmtpProtocol(Protocol):
     """Interprets the SMTP protocol."""
 
-    _commands = [
-        "ehlo", "helo", "mail from", "rcpt to", "etrn",
-        "turn", "atrn", "size", "etrn", "pipelining",
-        "chunking", "data", "dsn", "rset", "vrfy",
-        "help", "quit", "noop", "expn", "auth login",
-        "auth plain", "auth cram-md5", "auth",
-        "binarymime", "relay", "size", "starttls", "checkpoint",
-        "enhancedstatuscodes", "8bitmime", "send"
-    ]
+    def init(self, *args, **kwargs):
+        self.request = SmtpRequest()
+        self.reply = SmtpReply()
 
-    _command_field = {
-        "ehlo": "hostname",
-        "helo": "hostname",
-        "mail from": "mail_from",
-        "rcpt to": "mail_to"
-    }
+        # Current smtp command from client
+        self.command = None
 
-    # Min to max SMTP response codes
-    _min = 100
-    _max = 600
+        # Last smtp server response code
+        self.rescode = 0
+
+        # Last smtp server response message
+        self.message = ""
+
+        # Used in handler() to determine if the TCP stream
+        # was closed or is finished
+        self.stream = None
+
+        # Contains the functions to be called when this command is the first
+        # string in a request message
+        self._commands = {
+            "ehlo": self.handle_hostname,
+            "helo": self.handle_hostname,
+            "mail": self.handle_mail,
+            "rcpt": self.handle_rcpt,
+            "auth": self.handle_auth,
+            "etrn": None, "turn": None, "atrn": None, "size": None,
+            "etrn": None, "pipelining": None, "chunking": None, "data":None,
+            "dsn": None, "rset": None, "vrfy": None, "help": None,
+            "quit": None, "noop": None, "expn": None, "binarymime": None,
+            "relay": None, "size": None, "starttls": None, "checkpoint": None,
+            "enhancedstatuscodes": None, "8bitmime": None, "send": None
+        }
+
+        # Contains the functions to be called
+        # in the request handler after the server sents this response code
+        self._res_codes = {
+            334: self.handle_auth_serv_response,
+            354: self.handle_mailbody
+        }
 
     def handle(self, s, ts, protocol, sent, recv):
         if protocol != "tcp":
@@ -226,95 +235,37 @@ class SmtpProtocol(Protocol):
         if self.stream.state in ["conn_finish", "conn_closed"]:
             self.parent.handle(s, ts, "smtp", self.request, self.reply)
 
-    def init(self, *args, **kwargs):
-        self.request = SmtpRequest()
-        self.reply = SmtpReply()
+    def handle_hostname(self, data):
+        if len(data) > 1:
+            self.request.hostname = data[1]
 
-        # Current smtp command from client
-        self.command = None
+    def handle_rcpt(self, data):
+        if len(data) < 2:
+            return
+        for val in data:
+            self.request.mail_to.extend(re.findall('<(.*?)>', val, re.DOTALL))
 
-        # Last smtp server response code
-        self.last_rescode = 0
+    def handle_mail(self, data):
+        if len(data) < 2:
+            return
+        for val in data:
+            self.request.mail_from.extend(re.findall('<(.*?)>', val, re.DOTALL))
 
-        # Last smtp server response message
-        self.last_resmess = ""
-        self.stream = None
+    def handle_mailbody(self, data):
+        headers_mes = data.split("\r\n\r", 1)
+        if len(headers_mes) < 2:
+            return
 
-    def _split(self, data, spliton="\r\n", always_list=False, maxsplit=-1):
-        splitdata = filter(None, data.split(spliton, maxsplit))
-        if len(splitdata) < 1:
-            return None
-        elif len(splitdata) == 1 and not always_list:
-            return splitdata[0]
-        else:
-            return splitdata
+        self.request.message = headers_mes[1]
 
-    def _get_rescode(self, mes):
-        """"
-        Get the smtp server response code from a server reply
-        Returns None if no valid code or no code exists in the message
-        """
-        if len(mes) < 3:
-            return None
+        for header in headers_mes[0].split("\r\n"):
+            if ":" not in header:
+                continue
 
-        code = 0
-        try:
-            code = int(mes[:3])
-        except ValueError:
-            return None
-        if code >= self._min and code <= self._max:
-            return code
+            key, value = header.split(":", 1)
+            self.request.headers[key] = value
 
-    def get_command(self, request):
-        """
-        Get the smtp command from the request
-        Returns a used command. Returns None if command not valid
-        or no command exists in the message
-        """
-        command = None
-        res = request.lower()
-        for c in self._commands:
-            if res.startswith(c):
-                command = c
-                break
-
-        return command
-
-    def parse_request(self, request):
-        """"
-        Parses the requests sent by an smtp client. Values are stored in
-        a SmtpRequest object
-        """
-        self.request.raw.append(request)
-        self.command = self.get_command(request)
-
-        if self.command is not None:
-            r = re.compile(re.escape(self.command), re.IGNORECASE)
-            self.data = r.sub("", request)
-        else:
-            self.data = request
-
-        if self.command in self._command_field:
-            field = self._command_field[self.command]
-
-            if self.command in ["mail from", "rcpt to"]:
-                setattr(self.request, field,
-                        re.findall('<(.*?)>', self.data, re.DOTALL))
-            else:
-                setattr(self.request, field, self._split(self.data))
-
-        elif self.command is not None and self.command.startswith("auth"):
-            self.request.auth_type = self.command
-            self._handle_auth()
-        elif self.last_rescode == 334:
-            self._handle_auth()
-        elif self.last_rescode == 354:
-            headers_mes = self._split(request, spliton="\r\n\r",
-                                      always_list=True, maxsplit=1)
-            self.request.headers = self._split(headers_mes[0])
-            self.request.message = headers_mes[1]
-
-    def _handle_auth(self):
+    def handle_auth(self, data):
         """
         Determines what kind of authentication type was used
         and tries to collect the credentials based on the used authentication
@@ -322,41 +273,111 @@ class SmtpProtocol(Protocol):
 
         http://www.samlogic.net/articles/smtp-commands-reference-auth.htm
         """
-        if len(self.data) > 0:
-            if self.command == "auth plain":
-                self._handle_auth_plain_data(self.data)
-            elif self.command == "auth login":
-                try:
-                    self.request.username = self.data.decode("base64")
-                except binascii.Error as e:
-                    return
-            elif "UGFzc3dvcmQ6" in self.last_resmess:
-                try:
-                    self.request.password = self.data.decode("base64")
-                except binascii.Error:
-                    return
-            elif "VXNlcm5hbWU6" in self.last_resmess:
-                try:
-                    self.request.username = self.data.decode("base64")
-                except binascii.Error:
-                    return
-            elif self.last_rescode == 334 and self.request.auth_type == "auth plain":
-                self._handle_auth_plain_data(self.data)
-            elif self.last_rescode == 334 and self.request.auth_type == "auth cram-md5":
-                try:
-                    self.request.username = self._split(
-                        self.data.decode("base64"), spliton=" ", maxsplit=1
-                    )[0]
-                except (binascii.Error, IndexError):
-                    return
+        auth_handlers = {
+            "plain": self.handle_auth_plain,
+            "login": self.handle_auth_login
+        }
 
-    def _handle_auth_plain_data(self, data):
+        if len(data) < 2:
+            return
+
+        arg_first = data[1].lower()
+        if arg_first not in auth_handlers:
+            return
+
+        self.request.auth_type = arg_first
+
+        if len(data) > 2:
+            arg_second = data[2]
+            handler = auth_handlers[arg_first]
+            handler(arg_second)
+
+    def handle_auth_plain(self, arg):
         try:
-            user_pass = self._split(data.decode("base64"), spliton="\x00")
+            user_pass = filter(None, arg.decode("base64").split("\x00"))
+            if len(user_pass) < 2:
+                return
+
             self.request.username = user_pass[0]
             self.request.password = user_pass[1]
-        except (binascii.Error, IndexError):
+        except binascii.Error:
             return
+
+    def handle_auth_login(self, arg):
+        try:
+            self.request.username = arg.decode("base64")
+        except binascii.Error:
+            return
+
+    def handle_auth_cram_md5(self, arg):
+        user_challange = arg.decode("base64").split(" ", 1)
+        if len(user_challange) < 2:
+            return
+
+        self.request.username = user_challange[0]
+
+    def handle_auth_serv_response(self, data):
+        """
+        If not all credentials were passed as an argument to an auth
+        command, they will be later sent when the server requests them. If
+        that happens, this function extracts them
+        """
+        if len(data) < 1:
+            return
+
+        client_response = data[0]
+
+        if self.request.auth_type == "plain":
+            self.handle_auth_plain(client_response)
+
+        elif self.request.auth_type == "cram-md5":
+            self.handle_auth_cram_md5(client_response)
+
+        elif self.request.auth_type == "login":
+            if "UGFzc3dvcmQ6" in self.message:
+                try:
+                    self.request.password = client_response.decode("base64")
+                except binascii.Error:
+                    return
+            elif "VXNlcm5hbWU6" in self.message:
+                try:
+                    self.request.username = client_response.decode("base64")
+                except binascii.Error:
+                    return
+
+    def parse_request(self, request):
+        """"
+        Parses the requests sent by an smtp client. Values are stored in
+        a SmtpRequest object.
+        """
+        self.request.raw.append(request)
+
+        if self.command != "data":
+            data = request.split(None)
+        else:
+            data = request
+
+        if len(data) < 1:
+            return
+
+        cmd = data[0].lower()
+
+        # If no valid command is found, see if there are
+        # any actions to be performed for the last received response code
+        if cmd not in self._commands:
+            if self.rescode in self._res_codes:
+                handle = self._res_codes[self.rescode]
+                handle(data)
+            return
+
+        else:
+            self.command = cmd
+            handler = self._commands[cmd]
+            if handler is not None:
+                handler(data)
+
+    def default_handler(self, data):
+        pass
 
     def parse_reply(self, reply):
         """
@@ -364,19 +385,23 @@ class SmtpProtocol(Protocol):
         a SmtpReply object
         """
         self.reply.raw.append(reply)
-        self.last_resmess = reply
 
-        code = self._get_rescode(reply)
-        self.last_rescode = code
-
-        if code is None:
+        if len(reply) < 3:
             return
 
-        if code == 250:
-            self.reply.ok_responses.extend(self._split(reply, always_list=True))
-        elif code == 220:
-            self.reply.ready_message = self._split(reply)
+        code = reply[:3]
+        self.message = reply
 
+        if code.isdigit() and int(code) >= 100 and int(code) < 600:
+            self.rescode = int(code)
+
+            if code is None:
+                return
+
+            if self.rescode == 250:
+                self.reply.ok_responses.extend(filter(None, reply.split("\r\n")))
+            elif self.rescode == 220:
+                self.reply.ready_message = reply
 
 class SmtpRequest(object):
 
@@ -385,12 +410,11 @@ class SmtpRequest(object):
         self.password = None
         self.username = None
         self.auth_type = None
-        self.mail_from = None
+        self.mail_from = []
         self.message = None
-        self.mail_to = None
-        self.headers = None
+        self.mail_to = []
+        self.headers = {}
         self.raw = []
-
 
 class SmtpReply(object):
 

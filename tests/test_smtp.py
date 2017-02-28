@@ -51,18 +51,18 @@ def test_read_smtp_headers():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
     sent, recv = test.get_sent_recv()
 
-    expected = [
-        'Reply-To: <xxxxxx@xxxxx.co.uk>',
-        'From: "WShark User" <xxxxxx@xxxxx.co.uk>',
-        'To: <xxxxxx.xxxx@xxxxx.com>',
-        'Subject: Test message for capture',
-        'Date: Sun, 24 Jun 2007 10:56:03 +0200',
-        'MIME-Version: 1.0', 'Content-Type: multipart/mixed;',
-        '\tboundary="----=_NextPart_000_0012_01C7B64E.426C8120"',
-        'X-Mailer: Microsoft Office Outlook, Build 11.0.5510',
-        'Thread-Index: Ace2O6M0WGyVJP3rQCuQePVHKWo5Ag==',
-        'X-MimeOLE: Produced By Microsoft MimeOLE V6.00.2900.3138'
-    ]
+    expected = {
+        'Thread-Index': ' Ace2O6M0WGyVJP3rQCuQePVHKWo5Ag==',
+        'From': ' "WShark User" <xxxxxx@xxxxx.co.uk>',
+        'X-MimeOLE': ' Produced By Microsoft MimeOLE V6.00.2900.3138',
+        'To': ' <xxxxxx.xxxx@xxxxx.com>',
+        'Date': ' Sun, 24 Jun 2007 10:56:03 +0200',
+        'Reply-To': ' <xxxxxx@xxxxx.co.uk>',
+        'Subject': ' Test message for capture',
+        'Content-Type': ' multipart/mixed;',
+        'X-Mailer': ' Microsoft Office Outlook, Build 11.0.5510',
+        'MIME-Version': ' 1.0'
+    }
 
     assert expected == sent.headers
 
@@ -91,8 +91,8 @@ def test_get_username_password_auth_login_arg():
     data = "AUTH LOGIN Zm9vZEBiZWVyLnBseg=="
     pass_data = "U2hvb3BEYVdob29wIQ=="
     smtp.parse_request(data)
-    smtp.last_rescode = 334
-    smtp.last_resmess = "UGFzc3dvcmQ6"
+    smtp.rescode = 334
+    smtp.message = "UGFzc3dvcmQ6"
     smtp.parse_request(pass_data)
 
     expected = ["food@beer.plz", "ShoopDaWhoop!"]
@@ -106,8 +106,8 @@ def test_get_username_password_auth_plain():
     smtp.init()
 
     user_pass = "AHRlc3R1c2VyAEF3M3MwbVA0enpzIQ=="
-    smtp.last_rescode = 334
-    smtp.request.auth_type = "auth plain"
+    smtp.rescode = 334
+    smtp.request.auth_type = "plain"
     smtp.parse_request(user_pass)
 
     expected = ["testuser", "Aw3s0mP4zzs!"]
@@ -133,8 +133,8 @@ def test_get_username_cram_md5_challenge():
     smtp.init()
 
     challenge_res = "ZnJlZCA5ZTk1YWVlMDljNDBhZjJiODRhMGMyYjNiYmFlNzg2ZQ===="
-    smtp.last_rescode = 334
-    smtp.request.auth_type = "auth cram-md5"
+    smtp.rescode = 334
+    smtp.request.auth_type = "cram-md5"
     smtp.parse_request(challenge_res)
 
     assert "fred" == smtp.request.username
@@ -154,3 +154,11 @@ def test_smtp_reply_ok_responses():
     ]
 
     assert expected == recv.ok_responses
+
+def test_read_smtp_ready_message():
+    test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
+    sent, recv = test.get_sent_recv()
+
+    expected = "220 smtp006.mail.xxx.xxxxx.com ESMTP\r\n"
+
+    assert expected == recv.ready_message
