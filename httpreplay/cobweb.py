@@ -3,10 +3,10 @@
 # See the file 'LICENSE' for copying permission.
 
 import binascii
+import dpkt
 import logging
 import re
 import zlib
-import dpkt
 
 from httpreplay.exceptions import UnknownHttpEncoding
 from httpreplay.shoddy import Protocol
@@ -181,6 +181,15 @@ class HttpProtocol(Protocol):
 class SmtpProtocol(Protocol):
     """Interprets the SMTP protocol."""
 
+    _unimplemented = [
+        "etrn", "turn", "atrn", "size" ,
+        "etrn", "pipelining", "chunking", "data",
+        "dsn", "rset", "vrfy", "help" ,
+        "quit", "noop", "expn", "binarymime",
+        "relay", "size", "starttls", "checkpoint",
+        "enhancedstatuscodes", "8bitmime", "send"
+    ]
+
     def init(self, *args, **kwargs):
         self.request = SmtpRequest()
         self.reply = SmtpReply()
@@ -205,13 +214,7 @@ class SmtpProtocol(Protocol):
             "helo": self.handle_hostname,
             "mail": self.handle_mail,
             "rcpt": self.handle_rcpt,
-            "auth": self.handle_auth,
-            "etrn": None, "turn": None, "atrn": None, "size": None,
-            "etrn": None, "pipelining": None, "chunking": None, "data":None,
-            "dsn": None, "rset": None, "vrfy": None, "help": None,
-            "quit": None, "noop": None, "expn": None, "binarymime": None,
-            "relay": None, "size": None, "starttls": None, "checkpoint": None,
-            "enhancedstatuscodes": None, "8bitmime": None, "send": None
+            "auth": self.handle_auth
         }
 
         # Contains the functions to be called
@@ -283,6 +286,7 @@ class SmtpProtocol(Protocol):
 
         arg_first = data[1].lower()
         if arg_first not in auth_handlers:
+            log.warning("Unknown SMTP authentication type: \'%s\'" % arg_first)
             return
 
         self.request.auth_type = arg_first
@@ -310,11 +314,27 @@ class SmtpProtocol(Protocol):
             return
 
     def handle_auth_cram_md5(self, arg):
-        user_challange = arg.decode("base64").split(" ", 1)
+        try:
+            user_challange = arg.decode("base64").split(" ", 1)
+        except binascii.Error:
+            return
+
         if len(user_challange) < 2:
             return
 
         self.request.username = user_challange[0]
+
+    def handle_auth_login_serv_response(self, data):
+        if "UGFzc3dvcmQ6" in self.message:
+            try:
+                self.request.password = data.decode("base64")
+            except binascii.Error:
+                return
+        elif "VXNlcm5hbWU6" in self.message:
+            try:
+                self.request.username = data.decode("base64")
+            except binascii.Error:
+                return
 
     def handle_auth_serv_response(self, data):
         """
@@ -334,16 +354,7 @@ class SmtpProtocol(Protocol):
             self.handle_auth_cram_md5(client_response)
 
         elif self.request.auth_type == "login":
-            if "UGFzc3dvcmQ6" in self.message:
-                try:
-                    self.request.password = client_response.decode("base64")
-                except binascii.Error:
-                    return
-            elif "VXNlcm5hbWU6" in self.message:
-                try:
-                    self.request.username = client_response.decode("base64")
-                except binascii.Error:
-                    return
+            self.handle_auth_login_serv_response(client_response)
 
     def parse_request(self, request):
         """"
@@ -364,7 +375,7 @@ class SmtpProtocol(Protocol):
 
         # If no valid command is found, see if there are
         # any actions to be performed for the last received response code
-        if cmd not in self._commands:
+        if cmd not in self._commands and cmd not in self._unimplemented:
             if self.rescode in self._res_codes:
                 handle = self._res_codes[self.rescode]
                 handle(data)
@@ -372,12 +383,9 @@ class SmtpProtocol(Protocol):
 
         else:
             self.command = cmd
-            handler = self._commands[cmd]
-            if handler is not None:
+            if cmd in self._commands:
+                handler = self._commands[cmd]
                 handler(data)
-
-    def default_handler(self, data):
-        pass
 
     def parse_reply(self, reply):
         """
@@ -394,9 +402,6 @@ class SmtpProtocol(Protocol):
 
         if code.isdigit() and int(code) >= 100 and int(code) < 600:
             self.rescode = int(code)
-
-            if code is None:
-                return
 
             if self.rescode == 250:
                 self.reply.ok_responses.extend(filter(None, reply.split("\r\n")))
