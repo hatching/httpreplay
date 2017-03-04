@@ -1,3 +1,7 @@
+# Copyright (C) 2017 Jurriaan Bremer <jbr@cuckoo.sh>
+# This file is part of HTTPReplay - http://jbremer.org/httpreplay/
+# See the file 'LICENSE' for copying permission.
+
 import os
 
 from httpreplay.reader import PcapReader
@@ -5,31 +9,22 @@ from httpreplay.smegma import TCPPacketStreamer, TLSStream
 from httpreplay.cut import smtp_handler
 from httpreplay.cobweb import SmtpProtocol
 
-
 class SmtpTest(object):
     handlers = {
+        25: smtp_handler,
         587: smtp_handler,
-        25: smtp_handler
     }
 
     def __init__(self, pcapfile):
-        self.f = open(pcapfile, "rb")
-        self.reader = PcapReader(self.f)
-        self.reader.raise_exceptions = False
+        self.reader = PcapReader(open(pcapfile, "rb"))
         self.reader.tcp = TCPPacketStreamer(self.reader, self.handlers)
 
-
     def get_sent_recv(self):
-
-        s = None
-        r = None
+        s, r = None, None
         for s, ts, prot, sent, recv in self.reader.process():
             s = sent
             r = recv
-
-        self.f.close()
         return s, r
-
 
 def test_read_smtp_from_to():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
@@ -46,62 +41,48 @@ def test_read_smtp_from_to():
     ]
     assert expected == output
 
-
 def test_read_smtp_headers():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
     sent, recv = test.get_sent_recv()
-
-    expected = {
-        'Thread-Index': ' Ace2O6M0WGyVJP3rQCuQePVHKWo5Ag==',
-        'From': ' "WShark User" <xxxxxx@xxxxx.co.uk>',
-        'X-MimeOLE': ' Produced By Microsoft MimeOLE V6.00.2900.3138',
-        'To': ' <xxxxxx.xxxx@xxxxx.com>',
-        'Date': ' Sun, 24 Jun 2007 10:56:03 +0200',
-        'Reply-To': ' <xxxxxx@xxxxx.co.uk>',
-        'Subject': ' Test message for capture',
-        'Content-Type': ' multipart/mixed;',
-        'X-Mailer': ' Microsoft Office Outlook, Build 11.0.5510',
-        'MIME-Version': ' 1.0'
+    assert sent.headers == {
+        "Thread-Index": "Ace2O6M0WGyVJP3rQCuQePVHKWo5Ag==",
+        "From": '"WShark User" <xxxxxx@xxxxx.co.uk>',
+        "X-MimeOLE": "Produced By Microsoft MimeOLE V6.00.2900.3138",
+        "To": "<xxxxxx.xxxx@xxxxx.com>",
+        "Date": "Sun, 24 Jun 2007 10:56:03 +0200",
+        "Reply-To": "<xxxxxx@xxxxx.co.uk>",
+        "Subject": "Test message for capture",
+        "Content-Type": "multipart/mixed;",
+        "X-Mailer": "Microsoft Office Outlook, Build 11.0.5510",
+        "MIME-Version": "1.0",
     }
-
-    assert expected == sent.headers
-
 
 def test_read_smtp_message_body():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
     sent, recv = test.get_sent_recv()
-
-    expected = "\nThis is a multi-part message in MIME format.\r\n\r\n"
-
-    assert expected == sent.message[0:49]
-
+    assert sent.message[:48] == (
+        "This is a multi-part message in MIME format.\r\n\r\n"
+    )
 
 def test_get_username_password_auth_login():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
     sent, recv = test.get_sent_recv()
-
-    assert ["galunt", "V1v1tr0n"] == [sent.username, sent.password]
-
+    assert sent.username == "galunt"
+    assert sent.password == "V1v1tr0n"
 
 def test_get_username_password_auth_login_arg():
-
     smtp = SmtpProtocol()
     smtp.init()
 
-    data = "AUTH LOGIN Zm9vZEBiZWVyLnBseg=="
-    pass_data = "U2hvb3BEYVdob29wIQ=="
-    smtp.parse_request(data)
+    smtp.parse_request("AUTH LOGIN Zm9vZEBiZWVyLnBseg==")
     smtp.rescode = 334
     smtp.message = "UGFzc3dvcmQ6"
-    smtp.parse_request(pass_data)
+    smtp.parse_request("U2hvb3BEYVdob29wIQ==")
 
-    expected = ["food@beer.plz", "ShoopDaWhoop!"]
-
-    assert expected == [smtp.request.username, smtp.request.password]
-
+    assert smtp.request.username == "food@beer.plz"
+    assert smtp.request.password == "ShoopDaWhoop!"
 
 def test_get_username_password_auth_plain():
-
     smtp = SmtpProtocol()
     smtp.init()
 
@@ -110,55 +91,41 @@ def test_get_username_password_auth_plain():
     smtp.request.auth_type = "plain"
     smtp.parse_request(user_pass)
 
-    expected = ["testuser", "Aw3s0mP4zzs!"]
-
-    assert expected == [smtp.request.username, smtp.request.password]
-
+    assert smtp.request.username == "testuser"
+    assert smtp.request.password == "Aw3s0mP4zzs!"
 
 def test_get_username_password_auth_plain_arg():
-
     smtp = SmtpProtocol()
     smtp.init()
 
-    data = "AUTH PLAIN AHRlc3R1c2VyAEF3M3MwbVA0enpzIQ=="
-    smtp.parse_request(data)
-
-    expected = ["testuser", "Aw3s0mP4zzs!"]
-
-    assert expected == [smtp.request.username, smtp.request.password]
-
+    smtp.parse_request("AUTH PLAIN AHRlc3R1c2VyAEF3M3MwbVA0enpzIQ==")
+    assert smtp.request.username == "testuser"
+    assert smtp.request.password == "Aw3s0mP4zzs!"
 
 def test_get_username_cram_md5_challenge():
     smtp = SmtpProtocol()
     smtp.init()
 
-    challenge_res = "ZnJlZCA5ZTk1YWVlMDljNDBhZjJiODRhMGMyYjNiYmFlNzg2ZQ===="
     smtp.rescode = 334
     smtp.request.auth_type = "cram-md5"
-    smtp.parse_request(challenge_res)
-
-    assert "fred" == smtp.request.username
-
+    smtp.parse_request("ZnJlZCA5ZTk1YWVlMDljNDBhZjJiODRhMGMyYjNiYmFlNzg2ZQ==")
+    assert smtp.request.username == "fred"
+    assert smtp.request.password is None
 
 def test_smtp_reply_ok_responses():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
     sent, recv = test.get_sent_recv()
 
-    expected = [
-        '250-smtp006.mail.xxx.xxxxx.com',
-        '250-AUTH LOGIN PLAIN XYMCOOKIE',
-        '250-PIPELINING', '250 8BITMIME',
-        '250 ok',
-        '250 ok',
-        '250 ok 1182675387 qp 77793'
+    assert recv.ok_responses == [
+        "250-smtp006.mail.xxx.xxxxx.com",
+        "250-AUTH LOGIN PLAIN XYMCOOKIE",
+        "250-PIPELINING", '250 8BITMIME',
+        "250 ok",
+        "250 ok",
+        "250 ok 1182675387 qp 77793",
     ]
-
-    assert expected == recv.ok_responses
 
 def test_read_smtp_ready_message():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
     sent, recv = test.get_sent_recv()
-
-    expected = "220 smtp006.mail.xxx.xxxxx.com ESMTP\r\n"
-
-    assert expected == recv.ready_message
+    assert recv.ready_message == "220 smtp006.mail.xxx.xxxxx.com ESMTP\r\n"

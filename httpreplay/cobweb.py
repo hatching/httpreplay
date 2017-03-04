@@ -221,7 +221,7 @@ class SmtpProtocol(Protocol):
         # in the request handler after the server sents this response code
         self._res_codes = {
             334: self.handle_auth_serv_response,
-            354: self.handle_mailbody
+            354: self.handle_mailbody,
         }
 
     def handle(self, s, ts, protocol, sent, recv):
@@ -243,30 +243,26 @@ class SmtpProtocol(Protocol):
             self.request.hostname = data[1]
 
     def handle_rcpt(self, data):
-        if len(data) < 2:
-            return
         for val in data:
-            self.request.mail_to.extend(re.findall('<(.*?)>', val, re.DOTALL))
+            self.request.mail_to.extend(re.findall("<(.*?)>", val, re.DOTALL))
 
     def handle_mail(self, data):
-        if len(data) < 2:
-            return
         for val in data:
-            self.request.mail_from.extend(re.findall('<(.*?)>', val, re.DOTALL))
+            self.request.mail_from.extend(re.findall("<(.*?)>", val, re.DOTALL))
 
     def handle_mailbody(self, data):
-        headers_mes = data.split("\r\n\r", 1)
-        if len(headers_mes) < 2:
+        if "\r\n\r\n" not in data:
             return
 
-        self.request.message = headers_mes[1]
+        headers, message = data.split("\r\n\r\n", 1)
+        self.request.message = message
 
-        for header in headers_mes[0].split("\r\n"):
+        for header in headers.split("\r\n"):
             if ":" not in header:
                 continue
 
             key, value = header.split(":", 1)
-            self.request.headers[key] = value
+            self.request.headers[key] = value.strip()
 
     def handle_auth(self, data):
         """
@@ -292,9 +288,7 @@ class SmtpProtocol(Protocol):
         self.request.auth_type = arg_first
 
         if len(data) > 2:
-            arg_second = data[2]
-            handler = auth_handlers[arg_first]
-            handler(arg_second)
+            auth_handlers[arg_first](data[2])
 
     def handle_auth_plain(self, arg):
         try:
@@ -315,14 +309,10 @@ class SmtpProtocol(Protocol):
 
     def handle_auth_cram_md5(self, arg):
         try:
-            user_challange = arg.decode("base64").split(" ", 1)
-        except binascii.Error:
+            username, challenge = arg.decode("base64").split(None, 1)
+            self.request.username = username
+        except (binascii.Error, IndexError):
             return
-
-        if len(user_challange) < 2:
-            return
-
-        self.request.username = user_challange[0]
 
     def handle_auth_login_serv_response(self, data):
         if "UGFzc3dvcmQ6" in self.message:
@@ -342,19 +332,14 @@ class SmtpProtocol(Protocol):
         command, they will be later sent when the server requests them. If
         that happens, this function extracts them
         """
-        if len(data) < 1:
-            return
+        handlers = {
+            "plain": self.handle_auth_plain,
+            "login": self.handle_auth_login_serv_response,
+            "cram-md5": self.handle_auth_cram_md5,
+        }
 
-        client_response = data[0]
-
-        if self.request.auth_type == "plain":
-            self.handle_auth_plain(client_response)
-
-        elif self.request.auth_type == "cram-md5":
-            self.handle_auth_cram_md5(client_response)
-
-        elif self.request.auth_type == "login":
-            self.handle_auth_login_serv_response(client_response)
+        if data and self.request.auth_type in handlers:
+            handlers[self.request.auth_type](data[0])
 
     def parse_request(self, request):
         """"
@@ -368,7 +353,7 @@ class SmtpProtocol(Protocol):
         else:
             data = request
 
-        if len(data) < 1:
+        if not data:
             return
 
         cmd = data[0].lower()
@@ -377,15 +362,12 @@ class SmtpProtocol(Protocol):
         # any actions to be performed for the last received response code
         if cmd not in self._commands and cmd not in self._unimplemented:
             if self.rescode in self._res_codes:
-                handle = self._res_codes[self.rescode]
-                handle(data)
+                self._res_codes[self.rescode](data)
             return
 
-        else:
-            self.command = cmd
-            if cmd in self._commands:
-                handler = self._commands[cmd]
-                handler(data)
+        self.command = cmd
+        if cmd in self._commands:
+            self._commands[cmd](data)
 
     def parse_reply(self, reply):
         """
@@ -409,7 +391,6 @@ class SmtpProtocol(Protocol):
                 self.reply.ready_message = reply
 
 class SmtpRequest(object):
-
     def __init__(self):
         self.hostname = None
         self.password = None
@@ -422,7 +403,6 @@ class SmtpRequest(object):
         self.raw = []
 
 class SmtpReply(object):
-
     def __init__(self):
         self.ready_message = None
         self.ok_responses = []
