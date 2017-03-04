@@ -309,10 +309,12 @@ class SmtpProtocol(Protocol):
 
     def handle_auth_cram_md5(self, arg):
         try:
-            username, challenge = arg.decode("base64").split(None, 1)
-            self.request.username = username
-        except (binascii.Error, IndexError):
+            data = arg.decode("base64").split(None, 1)
+        except binascii.Error:
             return
+
+        if len(data) == 2:
+            self.request.username = data[0]
 
     def handle_auth_login_serv_response(self, data):
         if "UGFzc3dvcmQ6" in self.message:
