@@ -129,3 +129,19 @@ def test_read_smtp_ready_message():
     test = SmtpTest(os.path.join("tests", "pcaps", "smtp-auth-login.pcap"))
     sent, recv = test.get_sent_recv()
     assert recv.ready_message == "220 smtp006.mail.xxx.xxxxx.com ESMTP\r\n"
+
+    # In case of starttls, status 220 is used twice. Test if the banner
+    # is still extracted
+    smtp = SmtpProtocol()
+    smtp.init()
+    smtp.parse_reply("220 example.com (Tosti01) ESMTP Service ready\r\n")
+    smtp.parse_reply(
+        "250-example.com Hello WORKSTATION-42 [192.168.1.100]\r\n"
+        "250-AUTH LOGIN PLAIN\r\n"
+        "250-SIZE 69920427\r\n"
+        "250 STARTTLS\r\n"
+    )
+    smtp.parse_reply("220 OK STARTTLS ready\r\n")
+    assert smtp.reply.ready_message == (
+        "220 example.com (Tosti01) ESMTP Service ready\r\n"
+    )

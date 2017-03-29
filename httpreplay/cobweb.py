@@ -389,7 +389,7 @@ class SmtpProtocol(Protocol):
 
             if self.rescode == 250:
                 self.reply.ok_responses.extend(filter(None, reply.split("\r\n")))
-            elif self.rescode == 220:
+            elif self.rescode == 220 and self.reply.ready_message is None:
                 self.reply.ready_message = reply
 
 class SmtpRequest(object):
