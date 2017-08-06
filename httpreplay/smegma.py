@@ -122,10 +122,10 @@ class TCPStream(Protocol):
         if tcp.flags & dpkt.tcp.TH_RST:
             return
 
-        if tcp.flags != dpkt.tcp.TH_SYN:
+        if not to_server and tcp.flags != dpkt.tcp.TH_SYN:
             raise InvalidTcpPacketOrder(tcp)
 
-        if tcp.data:
+        if not to_server and tcp.data:
             raise UnexpectedTcpData(tcp)
 
         self.ts = ts

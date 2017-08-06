@@ -9,15 +9,12 @@ import logging
 import os
 import pytest
 
+from httpreplay.cobweb import parse_body
 from httpreplay.cut import (
     dummy_handler, http_handler, forward_handler, https_handler
 )
-from httpreplay.cobweb import parse_body
 from httpreplay.reader import PcapReader
 from httpreplay.smegma import TCPPacketStreamer
-from httpreplay.exceptions import (
-    UnknownEthernetProtocol, UnknownIpProtocol, UnknownDatalink
-)
 
 log = logging.getLogger(__name__)
 
@@ -326,7 +323,6 @@ class TestTLSWithRC4(PcapTest):
 
 class TestNoGzipBody(PcapTest):
     pcapfile = "nogzipbody.pcap"
-    expected_output = []
 
     def _https_handler():
         session_id = "479ef8a88198b5b3f7e5b8bf79dea2d0635300ad744de08deb4e83610c5227e9"
@@ -347,6 +343,10 @@ class TestNoGzipBody(PcapTest):
         "/fonts/source-sans-pro-subset/sourcesanspro-regular-webfont.eot?",
         "/fonts/gidole/gidole-regular-webfont.eot?",
     ]
+
+class TestOddSMB(PcapTest):
+    pcapfile = "invldord.pcap"
+    expected_output = []
 
 def test_read_chunked():
     def parse(content):
