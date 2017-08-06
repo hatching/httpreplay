@@ -17,4 +17,4 @@ from .reader import PcapReader
 from .shoddy import Protocol
 from .smegma import Packet, TCPPacketStreamer, TCPStream, TLSStream
 
-__version__ = "0.2"
+__version__ = "0.2.1"
