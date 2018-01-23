@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -22,7 +22,7 @@ setup(
     ],
     extras_require={
         "mitmproxy": [
-            "mitmproxy>=0.17",
+            "mitmproxy==0.18.2",
         ],
         "dev": [
             "pytest>=2.9.1"
