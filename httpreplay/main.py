@@ -54,10 +54,11 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
         from netlib.http import http1
         from netlib.exceptions import HttpException
     except ImportError:
-        raise click.Abort(
+        log.warning(
             "In order to use this utility it is required to have the "
             "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
         )
+        raise click.Abort
 
     class NetlibHttpProtocol(Protocol):
         """
