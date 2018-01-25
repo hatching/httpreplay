@@ -6,13 +6,10 @@ import click
 import io
 import logging
 
-from httpreplay.cut import (
-    http_handler, https_handler, smtp_handler
-)
+from httpreplay.cut import http_handler, https_handler, smtp_handler
 from httpreplay.misc import read_tlsmaster
 from httpreplay.reader import PcapReader
-from httpreplay.shoddy import Protocol
-from httpreplay.smegma import TCPPacketStreamer, TLSStream
+from httpreplay.smegma import TCPPacketStreamer
 
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -51,8 +48,8 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
     try:
         from mitmproxy import models
         from mitmproxy.flow import FlowWriter
-        from netlib.http import http1
         from netlib.exceptions import HttpException
+        from netlib.http import http1
     except ImportError:
         log.warning(
             "In order to use this utility it is required to have the "
@@ -60,89 +57,15 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
         )
         raise click.Abort
 
-    class NetlibHttpProtocol(Protocol):
-        """
-        Like HttpProtocol, but actually covering edge-cases.
-        """
-
-        @staticmethod
-        def read_body(io, expected_size):
-            """
-            Read a (malformed) HTTP body.
-            Returns:
-                A (body: bytes, is_malformed: bool) tuple.
-            """
-            body_start = io.tell()
-            try:
-                content = b"".join(http1.read_body(io, expected_size, None))
-                if io.read():  # leftover?
-                    raise HttpException()
-                return content, False
-            except HttpException:
-                io.seek(body_start)
-                return io.read(), True
-
-        def parse_request(self, ts, sent):
-            try:
-                sent = io.BytesIO(sent)
-                request = http1.read_request_head(sent)
-                body_size = http1.expected_http_body_size(request)
-                request.data.content, malformed = self.read_body(sent, body_size)
-                if malformed:
-                    request.headers["X-Mitmproxy-Malformed-Body"] = "1"
-                return request
-            except HttpException as e:
-                log.warning("{!r} (timestamp: {})".format(e, ts))
-
-        def parse_response(self, ts, recv, request):
-            try:
-                recv = io.BytesIO(recv)
-                response = http1.read_response_head(recv)
-                body_size = http1.expected_http_body_size(request, response)
-                response.data.content, malformed = self.read_body(recv, body_size)
-                if malformed:
-                    response.headers["X-Mitmproxy-Malformed-Body"] = "1"
-                return response
-            except HttpException as e:
-                log.warning("{!r} (timestamp: {})".format(e, ts))
-
-        def handle(self, s, ts, protocol, sent, recv):
-            if protocol not in ("tcp", "tls"):
-                self.parent.handle(s, ts, protocol, sent, recv)
-                return
-
-            req = None
-            if sent:
-                req = self.parse_request(ts, sent)
-
-            protocols = {
-                "tcp": "http",
-                "tls": "https",
-            }
-
-            # Only try to decode the HTTP response if the request was valid HTTP.
-            if req:
-                res = self.parse_response(ts, recv, req)
-
-                # Report this stream as being a valid HTTP stream.
-                self.parent.handle(s, ts, protocols[protocol],
-                                   req or sent, res)
-            else:
-                # This wasn't a valid HTTP stream so we forward the original TCP
-                # or TLS stream straight ahead to our parent.
-                self.parent.handle(s, ts, protocol, sent, recv)
-
     if tlsmaster:
         tlsmaster = read_tlsmaster(tlsmaster)
     else:
         tlsmaster = {}
 
-    netlib_http_handler = lambda: NetlibHttpProtocol()
-    netlib_https_handler = lambda: TLSStream(NetlibHttpProtocol(), tlsmaster)
     handlers = {
-        443: netlib_https_handler,
-        4443: netlib_https_handler,
-        "generic": netlib_http_handler,
+        443: lambda: https_handler(tlsmaster),
+        4443: lambda: https_handler(tlsmaster),
+        "generic": http_handler,
     }
 
     reader = PcapReader(pcapfile)
@@ -168,11 +91,28 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
 
         flow = models.HTTPFlow(client_conn, server_conn)
 
-        flow.request = models.HTTPRequest.wrap(sent)
+        try:
+            sent = io.BytesIO(sent.raw)
+            request = http1.read_request_head(sent)
+            body_size = http1.expected_http_body_size(request)
+            request.data.content = "".join(http1.read_body(sent, body_size, None))
+        except HttpException as e:
+            log.warning("Error parsing HTTP request: %s", e)
+            continue
+
+        flow.request = models.HTTPRequest.wrap(request)
         flow.request.host = dstip
         flow.request.port = dstport
         flow.request.scheme = protocol
-        if recv:
-            flow.response = models.HTTPResponse.wrap(recv)
+
+        try:
+            recv = io.BytesIO(recv.raw)
+            response = http1.read_response_head(recv)
+            body_size = http1.expected_http_body_size(request, response)
+            response.data.content = "".join(http1.read_body(recv, body_size, None))
+            flow.response = models.HTTPResponse.wrap(response)
+        except HttpException as e:
+            log.warning("Error parsing HTTP response: %s", e)
+            # Fall through (?)
 
         writer.add(flow)
