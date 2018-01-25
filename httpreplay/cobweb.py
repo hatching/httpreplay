@@ -176,6 +176,15 @@ class HttpProtocol(Protocol):
             # or TLS stream straight ahead to our parent.
             self.parent.handle(s, ts, protocol, sent, recv)
 
+class HttpsProtocol(HttpProtocol):
+    """HTTPS handler interprets HTTP only upon successful TLS decryption."""
+
+    def handle(self, s, ts, protocol, sent, recv):
+        if protocol != "tls":
+            return self.parent.handle(s, ts, protocol, sent, recv)
+
+        super(HttpsProtocol, self).handle(s, ts, protocol, sent, recv)
+
 class SmtpProtocol(Protocol):
     """Interprets the SMTP protocol."""
 

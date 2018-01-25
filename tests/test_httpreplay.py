@@ -6,6 +6,7 @@ import dpkt
 import hashlib
 import io
 import logging
+import mock
 import os
 import pytest
 
@@ -347,6 +348,25 @@ class TestNoGzipBody(PcapTest):
 class TestOddSMB(PcapTest):
     pcapfile = "invldord.pcap"
     expected_output = []
+
+class TestNoTLSKeys(object):
+    class DummyProtocol(object):
+        def __init__(self):
+            self.values = []
+
+        def handle(self, s, ts, protocol, sent, recv):
+            self.values.append((s, ts, protocol, sent, recv))
+
+    @mock.patch("httpreplay.cobweb.HttpProtocol.parse_request")
+    def test_no_tls_keys(self, p):
+        h = https_handler()
+        h.parent.parent = dummy = self.DummyProtocol()
+        h.handle((0, 0, 0, 0), 0, "tcp", "foo\r\n", "bar")
+
+        p.assert_not_called()
+        assert dummy.values == [
+            ((0, 0, 0, 0), 0, "tcp", "foo\r\n", "bar"),
+        ]
 
 def test_read_chunked():
     def parse(content):
