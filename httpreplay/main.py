@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -154,22 +154,23 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
         # Sort the http/https requests and responses by their timestamp.
         l = sorted(l, key=lambda x: x[1])
 
-    for addrs, timestamp, protocol, sent, recv in l:
+    for s, ts, protocol, sent, recv in l:
         if protocol not in ("http", "https"):
             continue
 
-        srcip, srcport, dstip, dstport = addrs
+        srcip, srcport, dstip, dstport = s
 
         client_conn = models.ClientConnection.make_dummy((srcip, srcport))
-        client_conn.timestamp_start = timestamp
+        client_conn.timestamp_start = ts
 
         server_conn = models.ServerConnection.make_dummy((dstip, dstport))
-        server_conn.timestamp_start = timestamp
+        server_conn.timestamp_start = ts
 
         flow = models.HTTPFlow(client_conn, server_conn)
 
         flow.request = models.HTTPRequest.wrap(sent)
-        flow.request.host, flow.request.port = dstip, dstport
+        flow.request.host = dstip
+        flow.request.port = dstport
         flow.request.scheme = protocol
         if recv:
             flow.response = models.HTTPResponse.wrap(recv)

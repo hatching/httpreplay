@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -33,7 +33,6 @@ class TCPPacketStreamer(Protocol):
         # which happens to be the pcap reader generally speaking, as parent.
         while handler.parent:
             handler = handler.parent
-
         handler.parent = self.parent
 
     def handler(self, (srcip, srcport, dstip, dstport)):
@@ -43,11 +42,11 @@ class TCPPacketStreamer(Protocol):
             return self.handlers[dstport]
         elif "generic" in self.handlers:
             return self.handlers["generic"]
-        else:
-            # Returning the abstract Protocol class here so all packets will
-            # end up in nowhere but at least there will still be a parent.
-            log.warning("Unhandled protocol port=%s/%s", srcport, dstport)
-            return Protocol
+
+        # Returning the abstract Protocol class here so all packets will
+        # end up in nowhere but at least there will still be a parent.
+        log.warning("Unhandled protocol port=%s/%s", srcport, dstport)
+        return Protocol
 
     def stream(self, ip, tcp, reverse=False):
         return (
@@ -279,9 +278,9 @@ class TCPStream(Protocol):
             return
 
         if tcp.data and to_server and self.recv:
-            sent = "".join(self.sent)
-            recv = "".join(self.recv)
-            self.parent.handle(self.s, self.ts, "tcp", sent, recv)
+            self.parent.handle(
+                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv)
+            )
             self.sent, self.recv = [], []
             self.ts = None
 
@@ -362,9 +361,9 @@ class TCPStream(Protocol):
 
     def finish(self):
         if self.sent or self.recv:
-            sent = "".join(self.sent)
-            recv = "".join(self.recv)
-            self.parent.handle(self.s, self.ts, "tcp", sent, recv)
+            self.parent.handle(
+                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv)
+            )
 
         if self.packets:
             log.warning(
@@ -380,21 +379,12 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
     functionality found in the tlslite library which does the actual TLS
     decryption."""
 
-    if not hasattr(dpkt.ssl, "SSL3_V"):
-        enabled = False
-        log.critical(
-            "You are using an old version of the dpkt Python library, please "
-            "update it to the latest version (`pip install -U dpkt`) or "
-            "TLS/HTTPS decryption will not work properly."
-        )
-    else:
-        enabled = True
-        tls_versions = {
-            dpkt.ssl.SSL3_V: (3, 0),
-            dpkt.ssl.TLS1_V: (3, 1),
-            dpkt.ssl.TLS11_V: (3, 2),
-            dpkt.ssl.TLS12_V: (3, 3),
-        }
+    tls_versions = {
+        dpkt.ssl.SSL3_V: (3, 0),
+        dpkt.ssl.TLS1_V: (3, 1),
+        dpkt.ssl.TLS11_V: (3, 2),
+        dpkt.ssl.TLS12_V: (3, 3),
+    }
 
     def init_cipher(self, tls_version, cipher_suite, master_secret,
                     client_random, server_random, cipher_implementations):
@@ -402,15 +392,16 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         self.version = self.tls_versions[tls_version]
 
         try:
-            self._calcPendingStates(cipher_suite, master_secret,
-                                    client_random, server_random,
-                                    cipher_implementations)
+            self._calcPendingStates(
+                cipher_suite, master_secret, client_random,
+                server_random, cipher_implementations
+            )
         except AssertionError:
             log.critical("Unsupported TLS cipher suite: 0x%x.", cipher_suite)
             return
 
-        self.server_cipher = self._recordLayer._pendingReadState
-        self.client_cipher = self._recordLayer._pendingWriteState
+        self.server_state = self._recordLayer._pendingReadState
+        self.client_state = self._recordLayer._pendingWriteState
         return True
 
     def decrypt(self, state, record_type, buf):
@@ -425,10 +416,10 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
             ))
 
     def decrypt_server(self, record_type, buf):
-        return self.decrypt(self.server_cipher, record_type, buf)
+        return self.decrypt(self.server_state, record_type, buf)
 
     def decrypt_client(self, record_type, buf):
-        return self.decrypt(self.client_cipher, record_type, buf)
+        return self.decrypt(self.client_state, record_type, buf)
 
 class TLSStream(Protocol):
     """Decrypts TLS streams into a TCPStream-like session."""
@@ -574,7 +565,7 @@ class TLSStream(Protocol):
     }
 
     def handle(self, s, ts, protocol, sent, recv):
-        if protocol != "tcp" or not self.tls.enabled:
+        if protocol != "tcp":
             self.parent.handle(s, ts, protocol, sent, recv)
             return
 

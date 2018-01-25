@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -29,7 +29,7 @@ class PcapTest(object):
 
     @staticmethod
     def format(self, s, ts, p, sent, recv):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def test_pcap(self):
         with open(os.path.join("tests", "pcaps", self.pcapfile), "rb") as f:

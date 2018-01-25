@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2017 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -156,8 +156,7 @@ class HttpProtocol(Protocol):
             self.parent.handle(s, ts, protocol, sent, recv)
             return
 
-        req = res = None
-
+        req = None
         if sent:
             req = self.parse_request(ts, sent)
 
@@ -171,8 +170,7 @@ class HttpProtocol(Protocol):
             res = self.parse_response(ts, recv)
 
             # Report this stream as being a valid HTTP stream.
-            self.parent.handle(s, ts, protocols[protocol],
-                               req or sent, res)
+            self.parent.handle(s, ts, protocols[protocol], req or sent, res)
         else:
             # This wasn't a valid HTTP stream so we forward the original TCP
             # or TLS stream straight ahead to our parent.
