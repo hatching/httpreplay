@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
@@ -7,7 +6,7 @@ from setuptools import setup
 
 setup(
     name="HTTPReplay",
-    version="0.2.1",
+    version="0.2.2",
     author="Jurriaan Bremer",
     author_email="jbr@cuckoo.sh",
     packages=[
