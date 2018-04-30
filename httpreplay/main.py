@@ -3,8 +3,10 @@
 # See the file 'LICENSE' for copying permission.
 
 import click
+import hashlib
 import io
 import logging
+import uuid
 
 from httpreplay.cut import http_handler, https_handler, smtp_handler
 from httpreplay.misc import read_tlsmaster
@@ -101,6 +103,8 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
             continue
 
         flow.request = models.HTTPRequest.wrap(request)
+        flow.request.timestamp_start = client_conn.timestamp_start
+
         flow.request.host = dstip
         flow.request.port = dstport
         flow.request.scheme = protocol
@@ -110,9 +114,16 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster, stream):
             response = http1.read_response_head(recv)
             body_size = http1.expected_http_body_size(request, response)
             response.data.content = "".join(http1.read_body(recv, body_size, None))
-            flow.response = models.HTTPResponse.wrap(response)
         except HttpException as e:
             log.warning("Error parsing HTTP response: %s", e)
             # Fall through (?)
+
+        flow.response = models.HTTPResponse.wrap(response)
+        flow.response.timestamp_start = server_conn.timestamp_start
+
+        flow.id = str(uuid.UUID(bytes=hashlib.md5("%d%d%s%s" % (
+            client_conn.timestamp_start, server_conn.timestamp_start,
+            request.data.content, response.data.content
+        )).digest()))
 
         writer.add(flow)

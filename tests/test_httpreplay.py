@@ -9,11 +9,13 @@ import logging
 import mock
 import os
 import pytest
+import tempfile
 
 from httpreplay.cobweb import parse_body
 from httpreplay.cut import (
     dummy_handler, http_handler, forward_handler, https_handler
 )
+from httpreplay.main import pcap2mitm
 from httpreplay.reader import PcapReader
 from httpreplay.smegma import TCPPacketStreamer
 
@@ -388,3 +390,13 @@ def test_init_reader():
     a = PcapReader("tests/pcaps/test.pcap")
     b = PcapReader(open("tests/pcaps/test.pcap", "rb"))
     assert list(a.pcap) == list(b.pcap)
+
+def test_pcap2mitm():
+    filepath = tempfile.mktemp()
+    pcap2mitm.callback(
+        "tests/pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
+        open(filepath, "wb"),  None, False
+    )
+    assert hashlib.md5(open(filepath, "rb").read()).hexdigest() == (
+        "667ce4057bb6cfa0082df6ca1ba40a87"
+    )
