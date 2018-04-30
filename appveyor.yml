@@ -5,10 +5,12 @@ environment:
 install:
   - "set PATH=%PYTHON%;%PYTHON%/Scripts;%PATH%"
 
-  - "python.exe setup.py develop"
+  - "pip.exe install -e ."
   - "pip.exe install mock pytest pytest-cov"
 
 build: false
 
 test_script:
   - "pytest.exe --cov=httpreplay"
+  - 'pip.exe install ".[mitmproxy]"'
+  - "pytest.exe --cov=httpreplay --cov-append"
