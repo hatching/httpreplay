@@ -2,3 +2,6 @@
 *.pyc
 *.pcap
 .cache/
+.pytest_cache/
+dist/
+.idea/

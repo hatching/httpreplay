@@ -4,11 +4,13 @@ python:
     - 2.7
 
 install:
-    - python setup.py develop
+    - pip install -e .
     - pip install mock pytest pytest-cov coveralls
 
 script:
     - py.test --cov=httpreplay
+    - pip install '.[mitmproxy]'
+    - py.test --cov=httpreplay --cov-append
 
 after_success:
     - coveralls

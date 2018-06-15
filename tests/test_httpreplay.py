@@ -9,13 +9,16 @@ import logging
 import mock
 import os
 import pytest
+import tempfile
 
 from httpreplay.cobweb import parse_body
 from httpreplay.cut import (
     dummy_handler, http_handler, forward_handler, https_handler
 )
+from httpreplay.main import do_pcap2mitm
 from httpreplay.reader import PcapReader
 from httpreplay.smegma import TCPPacketStreamer
+from httpreplay.utils import pcap2mitm
 
 log = logging.getLogger(__name__)
 
@@ -388,3 +391,29 @@ def test_init_reader():
     a = PcapReader("tests/pcaps/test.pcap")
     b = PcapReader(open("tests/pcaps/test.pcap", "rb"))
     assert list(a.pcap) == list(b.pcap)
+
+try:
+    import mitmproxy
+    mitmproxy  # Fake usage.
+except ImportError:
+    pass
+else:
+    def test_do_pcap2mitm():
+        filepath = tempfile.mktemp()
+        do_pcap2mitm.callback(
+            "tests/pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap",
+            open(filepath, "wb"),  None, False
+        )
+        assert hashlib.md5(open(filepath, "rb").read()).hexdigest() == (
+            "667ce4057bb6cfa0082df6ca1ba40a87"
+        )
+
+    def test_pcap2mitm():
+        filepath = tempfile.mktemp()
+        pcap2mitm(
+            open("tests/pcaps/2015-10-13-Neutrino-EK-traffic-second-run.pcap", "rb"),
+            open(filepath, "wb")
+        )
+        assert hashlib.md5(open(filepath, "rb").read()).hexdigest() == (
+            "667ce4057bb6cfa0082df6ca1ba40a87"
+        )
