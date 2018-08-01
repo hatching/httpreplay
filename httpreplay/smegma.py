@@ -410,6 +410,10 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
             return str(self._recordLayer._decryptThenMAC(
                 record_type, bytearray(buf)
             ))
+        elif state.encContext.isAEAD:
+            return str(self._recordLayer._decryptAndUnseal(
+                record_type, bytearray(buf)
+            ))
         else:
             return str(self._recordLayer._decryptStreamThenMAC(
                 record_type, bytearray(buf)
@@ -599,7 +603,11 @@ if 0xc009 not in _cs.ietfNames:
     _cs.ietfNames[0xC009] = "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"
     _cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA = 0xC00A
     _cs.ietfNames[0xC00A] = "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"
+    _cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 = 0xC02B
+    _cs.ietfNames[0xC02B] = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
     _cs.aes128Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
     _cs.aes256Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
     _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
     _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
+    _cs.aes128GcmSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
+    _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
