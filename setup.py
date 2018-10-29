@@ -17,7 +17,7 @@ setup(
     install_requires=[
         "dpkt==1.9.1",
         "tlslite-ng==0.7.5",
-        "click>=6.6, <7",
+        "click>=6.6, <7"
     ],
     extras_require={
         "mitmproxy": [
