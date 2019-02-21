@@ -1,4 +1,5 @@
 # Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2019 Hatching B.V.
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -73,6 +74,12 @@ def decode_gzip(ts, content):
                 "stitching TCP/IP packets back together (timestamp %f).", ts
             )
 
+def decode_deflate(ts, content):
+    try:
+        return zlib.decompress(content, -15)
+    except zlib.error as e:
+        log.warning("Error unpacking deflate stream in HTTP response.")
+
 def decode_pack200_gzip(ts, content):
     """Decompress HTTP pack200/gzip content, a gzip-compressed compressed
     JAR file.."""
@@ -91,6 +98,7 @@ def decode_identity(ts, content):
 
 content_encodings = {
     "gzip": decode_gzip,
+    "deflate": decode_deflate,
     "pack200-gzip": decode_pack200_gzip,
     "none": decode_none,
     "identity": decode_identity,
