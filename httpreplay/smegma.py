@@ -423,12 +423,14 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         try:
             return self.decrypt(self.server_state, record_type, buf)
         except tlslite.errors.TLSBadRecordMAC:
+            log.warning("Bad MAC record, cannot decrypt server stream.")
             return ""
 
     def decrypt_client(self, record_type, buf):
         try:
             return self.decrypt(self.client_state, record_type, buf)
         except tlslite.errors.TLSBadRecordMAC:
+            log.warning("Bad MAC record, cannot decrypt client stream.")
             return ""
 
 class TLSStream(Protocol):
