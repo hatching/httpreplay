@@ -46,7 +46,11 @@ def parse_body(f, headers):
     if headers.get("transfer-encoding", "").lower() == "chunked":
         body = "".join(_read_chunked(f))
     elif "content-length" in headers:
-        n = int(headers["content-length"])
+        cl = headers["content-length"]
+        if isinstance(cl, list):
+            n = int(cl[-1])
+        else:
+            n = int(cl)
         body = f.read(n)
         # TODO Report a warning if we couldn't read the entire body (but don't
         # raise an exception as dpkt.http would do).
