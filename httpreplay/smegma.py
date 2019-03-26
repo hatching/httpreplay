@@ -420,10 +420,18 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
             ))
 
     def decrypt_server(self, record_type, buf):
-        return self.decrypt(self.server_state, record_type, buf)
+        try:
+            return self.decrypt(self.server_state, record_type, buf)
+        except tlslite.errors.TLSBadRecordMAC:
+            log.warning("Bad MAC record, cannot decrypt server stream.")
+            return ""
 
     def decrypt_client(self, record_type, buf):
-        return self.decrypt(self.client_state, record_type, buf)
+        try:
+            return self.decrypt(self.client_state, record_type, buf)
+        except tlslite.errors.TLSBadRecordMAC:
+            log.warning("Bad MAC record, cannot decrypt client stream.")
+            return ""
 
 class TLSStream(Protocol):
     """Decrypts TLS streams into a TCPStream-like session."""
@@ -615,3 +623,4 @@ if 0xc009 not in _cs.ietfNames:
     _cs.aes256GcmSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)
     _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
     _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)
+
