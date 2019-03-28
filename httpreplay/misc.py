@@ -11,5 +11,7 @@ def read_tlsmaster(filepath):
     for line in open(filepath, "rb"):
         x = re.match(tlsmaster, line)
         if x:
-            ret[x.group("sid").decode("hex")] = x.group("key").decode("hex")
+            sid = x.group("sid").strip()
+            key = x.group("key").strip()
+            ret[sid.decode("hex")] = key.decode("hex")
     return ret
