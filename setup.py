@@ -1,4 +1,5 @@
 # Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2019 Hatching B.V.
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -6,9 +7,9 @@ from setuptools import setup
 
 setup(
     name="HTTPReplay",
-    version="0.2.4",
-    author="Jurriaan Bremer",
-    author_email="jbr@cuckoo.sh",
+    version="0.2.5",
+    author="Hatching B.V.",
+    author_email="info@hatching.io",
     packages=[
         "httpreplay",
     ],

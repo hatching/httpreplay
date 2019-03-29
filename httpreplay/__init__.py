@@ -1,4 +1,5 @@
 # Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2019 Hatching B.V.
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -17,4 +18,4 @@ from .reader import PcapReader
 from .shoddy import Protocol
 from .smegma import Packet, TCPPacketStreamer, TCPStream, TLSStream
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
