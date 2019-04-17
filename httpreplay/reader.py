@@ -152,7 +152,7 @@ class PcapReader(object):
     def handle(self, s, ts, protocol, sent, recv):
         self.values.append((s, ts, protocol, sent, recv))
 
-def init_to_str(inet):
+def inet_to_str(inet):
     try:
         return socket.inet_ntop(socket.AF_INET, inet)
     except ValueError:
