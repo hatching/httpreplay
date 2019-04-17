@@ -2,10 +2,10 @@
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
+import dpkt
 import logging
 import socket
 import traceback
-import dpkt
 
 from httpreplay.exceptions import (
     UnknownDatalink, UnknownEthernetProtocol, UnknownIpProtocol,
