@@ -479,12 +479,17 @@ class TLSStream(Protocol):
         client_random = self.client_hello.data.random
         server_random = self.server_hello.data.random
 
-        # The master secret can be obtained through the session id as well
-        # as a (client random, server random) tuple.
+        # The master secret can be obtained through the session id or
+        # a (client random, server random) tuple or the client random only.
         if self.server_hello.data.session_id in self.secrets:
             master_secret = self.secrets[self.server_hello.data.session_id]
+            log.debug("Master Secret: Session id found")
+        elif client_random in self.secrets:
+            master_secret = self.secrets[client_random]
+            log.debug("Master Secret: Client random found")
         elif (client_random, server_random) in self.secrets:
             master_secret = self.secrets[client_random, server_random]
+            log.debug("Master Secret: (client_random, server_random) found")
         else:
             log.info("Could not find TLS master secret for stream "
                      "%s:%d -> %s:%d, skipping it.", *s)
