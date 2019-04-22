@@ -8,6 +8,7 @@ import dpkt
 import logging
 import re
 import zlib
+import brotli
 
 from httpreplay.exceptions import UnknownHttpEncoding
 from httpreplay.shoddy import Protocol
@@ -100,12 +101,17 @@ def decode_identity(ts, content):
     """Identity encoding, an encoding that doesn't change the content."""
     return content
 
+def decode_br(ts, content):
+    """ Decompress br encoded content, using the brotli algorithm"""
+    return brotli.decompress(content)
+
 content_encodings = {
     "gzip": decode_gzip,
     "deflate": decode_deflate,
     "pack200-gzip": decode_pack200_gzip,
     "none": decode_none,
     "identity": decode_identity,
+    "br": decode_br,
 }
 
 class _Response(object):

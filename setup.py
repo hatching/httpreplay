@@ -19,6 +19,7 @@ setup(
         "dpkt==1.8.7",
         "tlslite-ng==0.6.0",
         "click>=6.6, <7",
+        "brotli==1.0.7",
     ],
     extras_require={
         "mitmproxy": [
@@ -26,7 +27,7 @@ setup(
         ],
         "dev": [
             "pytest>=2.9.1"
-        ]
+        ],
     },
     entry_points={
         "console_scripts": [
