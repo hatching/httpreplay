@@ -5,7 +5,7 @@ python:
 
 install:
     - pip3 install -e .
-    - pip3 install mock pytest pytest-cov coveralls
+    - pip3 install mock pytest==4.4.1 pytest-cov coveralls
 
 script:
     - py.test --cov=httpreplay
