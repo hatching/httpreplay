@@ -9,7 +9,7 @@ install:
 
 script:
     - py.test --cov=httpreplay
-    - pip install '.[mitmproxy]'
+    - pip3 install '.[mitmproxy]'
     - py.test --cov=httpreplay --cov-append
 
 after_success:

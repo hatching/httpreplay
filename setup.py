@@ -27,7 +27,7 @@ setup(
             "mitmproxy==4.0.4",
         ],
         "dev": [
-            "pytest>=2.9.2",
+            "pytest==4.4.1",
             "mock==2.0.0",
         ]
     },
