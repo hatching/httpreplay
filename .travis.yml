@@ -8,9 +8,9 @@ install:
     - pip3 install mock pytest pytest-cov coveralls
 
 script:
+    - pip3 install '.[dev]'
     - py.test --cov=httpreplay
     - pip3 install '.[mitmproxy]'
-    - pip3 install '.[dev]'
     - py.test --cov=httpreplay --cov-append
 
 after_success:
