@@ -8,6 +8,9 @@ import dpkt
 import logging
 import re
 import zlib
+import brotli
+import re
+import base64
 
 from httpreplay.exceptions import UnknownHttpEncoding
 from httpreplay.shoddy import Protocol
@@ -44,7 +47,7 @@ def parse_body(f, headers):
     This is a modified version of dpkt.http.parse_body() which tolerates cut
     off HTTP bodies."""
     if headers.get("transfer-encoding", "").lower() == "chunked":
-        body = "".join(_read_chunked(f))
+        body = b"".join(_read_chunked(f))
     elif "content-length" in headers:
         cl = headers["content-length"]
         if isinstance(cl, list):
@@ -100,19 +103,41 @@ def decode_identity(ts, content):
     """Identity encoding, an encoding that doesn't change the content."""
     return content
 
+def decode_br(ts, content):
+    """ Decompress br encoded content, using the brotli algorithm"""
+    return brotli.decompress(content)
+
 content_encodings = {
     "gzip": decode_gzip,
     "deflate": decode_deflate,
     "pack200-gzip": decode_pack200_gzip,
     "none": decode_none,
     "identity": decode_identity,
+    "br": decode_br,
 }
+
+class _Request(object):
+    """Dummy HTTP request object which only has the raw paremeter set."""
+
+    def __init__(self, raw):
+        try:
+            self.raw = raw.decode("utf-8")
+        except (ValueError, UnicodeDecodeError) as e:
+            log.info(e)
+            self.raw = raw
+
+        self.body = None
 
 class _Response(object):
     """Dummy HTTP response object which only has the raw paremeter set."""
 
     def __init__(self, raw):
-        self.raw = raw
+        try:
+            self.raw = raw.decode("utf-8")
+        except(ValueError, UnicodeDecodeError) as e:
+            log.info(e)
+            self.raw = raw
+
         self.body = None
 
 class HttpProtocol(Protocol):
@@ -124,12 +149,17 @@ class HttpProtocol(Protocol):
             res.raw = sent
             return res
         except dpkt.UnpackError as e:
-            if e.message.startswith("invalid http method"):
+            if str(e).startswith("invalid http method"):
                 log.warning("This is not a HTTP request (timestamp %f).", ts)
+            elif str(e).startswith("invalid request"):
+                log.warning("This is an invalid HTTP request (timestamp %f): %s", ts, e)
             else:
                 log.warning(
                     "Unknown HTTP request error (timestamp %f): %s", ts, e
                 )
+
+        # Return dummy object
+        return _Request(sent)
 
     def parse_response(self, ts, recv):
         try:
@@ -146,19 +176,21 @@ class HttpProtocol(Protocol):
             res.raw = recv
             return res
         except dpkt.NeedData as e:
-            if e.message == "premature end of chunked body":
+            if str(e).startswith("premature end of chunked body"):
                 log.warning("Chunked HTTP response is most likely missing "
-                            "data in the network stream (timestamp %f).", ts)
+                        "data in the network stream (timestamp %f)", ts)
             else:
                 log.warning(
                     "Unknown HTTP response error (timestamp %f): %s", ts, e
                 )
         except dpkt.UnpackError as e:
-            if e.message == "missing chunk size":
+            if str(e).startswith("missing chunk size"):
                 log.warning(
                     "Server informed us about a Chunked HTTP response but "
                     "there doesn't appear to be one (timestamp %f).", ts
                 )
+            elif str(e).startswith("invalid response"):
+                log.warning("This is an invalid HTTP response (timestamp %f): %s", ts, e)
 
         # Return dummy object.
         return _Response(recv)
@@ -178,11 +210,11 @@ class HttpProtocol(Protocol):
         }
 
         # Only try to decode the HTTP response if the request was valid HTTP.
-        if req:
+        if req != None and not isinstance(req,_Request):
             res = self.parse_response(ts, recv)
 
             # Report this stream as being a valid HTTP stream.
-            self.parent.handle(s, ts, protocols[protocol], req or sent, res)
+            self.parent.handle(s, ts, protocols[protocol], req, res)
         else:
             # This wasn't a valid HTTP stream so we forward the original TCP
             # or TLS stream straight ahead to our parent.
@@ -244,13 +276,13 @@ class SmtpProtocol(Protocol):
         }
 
     def handle(self, s, ts, protocol, sent, recv):
+
         if protocol != "tcp":
             self.parent.handle(s, ts, protocol, sent, recv)
             return
 
         if self.stream is None:
             self.stream = self.parent.tcp.streams[s]
-
         self.parse_request(sent)
         self.parse_reply(recv)
 
@@ -263,20 +295,21 @@ class SmtpProtocol(Protocol):
 
     def handle_rcpt(self, data):
         for val in data:
-            self.request.mail_to.extend(re.findall("<(.*?)>", val, re.DOTALL))
+            self.request.mail_to.extend(re.findall("<(.*?)>", val.decode("utf-8"), re.DOTALL))
 
     def handle_mail(self, data):
         for val in data:
-            self.request.mail_from.extend(re.findall("<(.*?)>", val, re.DOTALL))
+            self.request.mail_from.extend(re.findall("<(.*?)>", val.decode("utf-8"), re.DOTALL))
 
     def handle_mailbody(self, data):
-        if "\r\n\r\n" not in data:
+        if b"\r\n\r\n" not in data:
             return
 
-        headers, message = data.split("\r\n\r\n", 1)
+        headers, message = data.split(b"\r\n\r\n", 1)
         self.request.message = message
 
-        for header in headers.split("\r\n"):
+        for header in headers.split(b"\r\n"):
+            header = header.decode("utf-8")
             if ":" not in header:
                 continue
 
@@ -300,6 +333,8 @@ class SmtpProtocol(Protocol):
             return
 
         arg_first = data[1].lower()
+        if isinstance(arg_first,bytes):
+            arg_first = arg_first.decode("utf-8")
         if arg_first not in auth_handlers:
             log.warning("Unknown SMTP authentication type: \'%s\'" % arg_first)
             return
@@ -311,7 +346,7 @@ class SmtpProtocol(Protocol):
 
     def handle_auth_plain(self, arg):
         try:
-            user_pass = filter(None, arg.decode("base64").split("\x00"))
+            user_pass = [x.decode("utf-8") for x in base64.b64decode(arg).split(b"\x00") if x != b'']
             if len(user_pass) < 2:
                 return
 
@@ -322,28 +357,28 @@ class SmtpProtocol(Protocol):
 
     def handle_auth_login(self, arg):
         try:
-            self.request.username = arg.decode("base64")
+            self.request.username = base64.b64decode(arg).decode("utf-8")
         except binascii.Error:
             return
 
     def handle_auth_cram_md5(self, arg):
         try:
-            data = arg.decode("base64").split(None, 1)
+            data = base64.b64decode(arg).split(None, 1)
         except binascii.Error:
             return
 
         if len(data) == 2:
-            self.request.username = data[0]
+            self.request.username = data[0].decode("utf-8")
 
     def handle_auth_login_serv_response(self, data):
-        if "UGFzc3dvcmQ6" in self.message:
+        if "UGFzc3dvcmQ6" in self.message.decode("utf-8"):
             try:
-                self.request.password = data.decode("base64")
+                self.request.password = base64.b64decode(data).decode("utf-8")
             except binascii.Error:
                 return
-        elif "VXNlcm5hbWU6" in self.message:
+        elif "VXNlcm5hbWU6" in self.message.decode("utf-8"):
             try:
-                self.request.username = data.decode("base64")
+                self.request.username = base64.b64decode(data).decode("utf-8")
             except binascii.Error:
                 return
 
@@ -377,7 +412,10 @@ class SmtpProtocol(Protocol):
         if not data:
             return
 
-        cmd = data[0].lower()
+        if isinstance(data, list):
+            cmd = data[0].lower().decode("utf-8")
+        else:
+            cmd = b"\x00"
 
         # If no valid command is found, see if there are
         # any actions to be performed for the last received response code
@@ -387,6 +425,7 @@ class SmtpProtocol(Protocol):
             return
 
         self.command = cmd
+
         if cmd in self._commands:
             self._commands[cmd](data)
 
@@ -407,7 +446,7 @@ class SmtpProtocol(Protocol):
             self.rescode = int(code)
 
             if self.rescode == 250:
-                self.reply.ok_responses.extend(filter(None, reply.split("\r\n")))
+                self.reply.ok_responses.extend([x.decode("utf-8") for x in filter(None, reply.split(b"\r\n"))])
             elif self.rescode == 220 and self.reply.ready_message is None:
                 self.reply.ready_message = reply
 

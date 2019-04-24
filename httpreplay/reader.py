@@ -2,8 +2,10 @@
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
+from past.builtins import basestring
 import dpkt
 import logging
+import socket
 import traceback
 
 from httpreplay.exceptions import (
@@ -59,7 +61,8 @@ class PcapReader(object):
             return
 
         for ts, packet in self.pcap:
-            if isinstance(packet, str):
+
+            if isinstance(packet, bytes):
                 if self.pcap.datalink() == dpkt.pcap.DLT_EN10MB:
                     packet = self._parse_ethernet(packet)
                 elif self.pcap.datalink() == 101:
@@ -132,4 +135,8 @@ class PcapReader(object):
             yield self.values.pop(0)
 
     def handle(self, s, ts, protocol, sent, recv):
+        if sent == b"":
+            sent = ""
+        if recv == b"":
+            recv = ""
         self.values.append((s, ts, protocol, sent, recv))
