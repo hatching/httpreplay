@@ -135,8 +135,4 @@ class PcapReader(object):
             yield self.values.pop(0)
 
     def handle(self, s, ts, protocol, sent, recv):
-        if sent == b"":
-            sent = ""
-        if recv == b"":
-            recv = ""
         self.values.append((s, ts, protocol, sent, recv))

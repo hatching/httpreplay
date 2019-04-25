@@ -286,6 +286,7 @@ class TCPStream(Protocol):
             self.sent, self.recv = [], []
             self.ts = None
 
+        # Switch bytes to str
         packet = Packet(tcp.data)
         packet.ts = ts
 

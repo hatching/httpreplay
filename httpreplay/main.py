@@ -37,7 +37,7 @@ def httpreplay(pcapfile, tlsmaster):
     reader.tcp = TCPPacketStreamer(reader, handlers)
 
     for s, ts, protocol, sent, recv in reader.process():
-        print(s, "%f" % ts, protocol, getattr(sent, "uri", None))
+        print(s, "%f" % ts, protocol, getattr(sent, "uri", sent))
 
 @click.command()
 @click.argument("pcapfile", type=click.File("rb"))

@@ -93,8 +93,8 @@ class TestEmptyRequest(PcapTest):
         return s[0], sent, recv
 
     expected_output = [
-        ("172.16.165.133", "", b"220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
-        ("172.16.165.133", "", b"220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
+        ("172.16.165.133", "", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
+        ("172.16.165.133", "", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
     ]
 
 class TestCutoff(PcapTest):
@@ -287,7 +287,7 @@ class TestWeirdRetransmission(PcapTest):
         "/jmx-console/filterView.jsp",
         "/jmx-console/images/newlogo.gif",
         "/favicon.ico",
-        b"\x00\x00\x00\x00\x00"
+        "\x00\x00\x00\x00\x00"
     ]
 
 class TestClientSideInvalidTcpPacketOrder(PcapTest):
@@ -377,7 +377,8 @@ def test_read_chunked():
         try:
             headers = {"transfer-encoding": "chunked"}
             return parse_body(io.BytesIO(content), headers)
-        except:
+        except Exception as e:
+            print(e)
             return False
 
     assert parse(b"1\r\na\r\n0\r\n\r\n") == b"a"
