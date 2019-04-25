@@ -108,7 +108,7 @@ def test_get_username_cram_md5_challenge():
 
     smtp.rescode = 334
     smtp.request.auth_type = "cram-md5"
-    smtp.parse_request(b"ZnJlZCA5ZTk1YWVlMDljNDBhZjJiODRhMGMyYjNiYmFlNzg2ZQ==")
+    smtp.parse_request("ZnJlZCA5ZTk1YWVlMDljNDBhZjJiODRhMGMyYjNiYmFlNzg2ZQ==")
     assert smtp.request.username == "fred"
     assert smtp.request.password is None
 
