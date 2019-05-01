@@ -98,10 +98,14 @@ def decode_pack200_gzip(ts, content):
 
 def decode_none(ts, content):
     """None encoding."""
+    if isinstance(content, str):
+        content = content.encode("utf-8")
     return content
 
 def decode_identity(ts, content):
     """Identity encoding, an encoding that doesn't change the content."""
+    if isinstance(content, str):
+        content = content.encode("utf-8")
     return content
 
 def decode_br(ts, content):

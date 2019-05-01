@@ -565,6 +565,12 @@ class TLSStream(Protocol):
                         ts,
                     )
 
+            if not isinstance(sent[0], bytes):
+                sent = [ord(c) if len(c) != 0 else b"" for c in sent]
+
+            if not isinstance(recv[0], bytes):
+                recv = [ord(c) if len(c) != 0 else b"" for c in recv]
+
             self.parent.handle(s, ts, "tls", b"".join(sent), b"".join(recv))
             return True
 
