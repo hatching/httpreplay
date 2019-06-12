@@ -25,7 +25,7 @@ setup(
             "mitmproxy==0.18.2",
         ],
         "dev": [
-            "pytest>=2.9.1"
+            "pytest>=4.4.1"
         ]
     },
     entry_points={
