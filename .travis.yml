@@ -4,8 +4,8 @@ python:
     - 3.6
 
 install:
-    - pip3 install -e .
-    - pip3 install mock pytest pytest-cov coveralls
+    - pip install -e .
+    - pip install mock pytest==4.4.1 pytest-cov coveralls
 
 script:
     - pip3 install '.[dev]'

@@ -1,4 +1,4 @@
-# Copyright (C) 2015 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2019 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -10,6 +10,7 @@ import traceback
 
 from httpreplay.exceptions import (
     UnknownDatalink, UnknownEthernetProtocol, UnknownIpProtocol,
+    UnknownTcpSequenceNumber, InvalidTcpPacketOrder, UnexpectedTcpData
 )
 
 log = logging.getLogger(__name__)
@@ -118,7 +119,23 @@ class PcapReader(object):
                 ip = None
 
             if isinstance(packet, dpkt.tcp.TCP):
-                self.tcp and self.tcp.process(ts, ip, packet)
+                try:
+                    self.tcp and self.tcp.process(ts, ip, packet)
+                except InvalidTcpPacketOrder as e:
+                    log.error(
+                        "Invalid TCP packet order. Ts: %s (%s -> %s). %s", ts,
+                        init_to_str(ip.src), init_to_str(ip.dst), e
+                    )
+                except UnknownTcpSequenceNumber as e:
+                    log.error(
+                        "Unknown TCP sequence number. Ts: %s (%s -> %s). %s",
+                        ts, init_to_str(ip.src), init_to_str(ip.dst), e
+                    )
+                except UnexpectedTcpData as e:
+                    log.error(
+                        "Unexpected TCP data. Ts: %s (%s -> %s). %s", ts,
+                        init_to_str(ip.src), init_to_str(ip.dst), e
+                    )
 
             if isinstance(packet, dpkt.udp.UDP):
                 self.udp and self.udp.process(ts, ip, packet)
@@ -136,3 +153,9 @@ class PcapReader(object):
 
     def handle(self, s, ts, protocol, sent, recv):
         self.values.append((s, ts, protocol, sent, recv))
+
+def inet_to_str(inet):
+    try:
+        return socket.inet_ntop(socket.AF_INET, inet)
+    except ValueError:
+        return socket.inet_ntop(socket.AF_INET6, inet)

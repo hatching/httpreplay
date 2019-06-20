@@ -27,8 +27,8 @@ setup(
             "mitmproxy==4.0.4",
         ],
         "dev": [
-            "pytest==4.4.1",
             "mock==2.0.0",
+            "pytest>=4.4.1"
         ]
     },
     entry_points={
