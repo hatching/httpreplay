@@ -123,24 +123,22 @@ content_encodings = {
 
 def bytes_to_str(b):
     """ Return the string representation of the bytes-like object"""
-    string = []
-    for c in b:
-        if c != 0:
-            string.append(chr(c))
-        else:
-            string.append("\x00")
-    return "".join(string)
+    try:
+        string = []
+        for c in b:
+            if c != 0:
+                string.append(chr(c))
+            else:
+                string.append("\x00")
+        return "".join(string)
+    except (ValueError, UnicodeDecodeError, TypeError) as e:
+        return b
 
 class _Request(object):
     """Dummy HTTP request object which only has the raw paremeter set."""
 
     def __init__(self, raw):
-        try:
-            self.raw = bytes_to_str(raw)
-        except (ValueError, UnicodeDecodeError) as e:
-            log.info(e)
-            self.raw = raw
-
+        self.raw = bytes_to_str(raw)
         self.body = None
 
     def __str__(self):
@@ -150,12 +148,7 @@ class _Response(object):
     """Dummy HTTP response object which only has the raw paremeter set."""
 
     def __init__(self, raw):
-        try:
-            self.raw = bytes_to_str(raw)
-        except(ValueError, UnicodeDecodeError) as e:
-            log.info(e)
-            self.raw = raw
-
+        self.raw = bytes_to_str(raw)
         self.body = None
 
     def __str__(self):
