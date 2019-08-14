@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2019 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -11,11 +11,29 @@ from httpreplay.exceptions import (
     UnknownTcpSequenceNumber, UnexpectedTcpData, InvalidTcpPacketOrder,
 )
 from httpreplay.shoddy import Protocol
+from httpreplay.misc import JA3, patch_dpkt_ssl_tlshello_unpacks
+
+# Patch dpkt v1.8.7 to support reading TLShello extensions. See method
+# description for further info.
+patch_dpkt_ssl_tlshello_unpacks()
 
 log = logging.getLogger(__name__)
 
 class Packet(str):
     ts = None
+
+class TLSInfo(object):
+    def __init__(self, JA3, JA3S, JA3_params, JA3S_params, client_hello,
+                 server_hello):
+        self.JA3 = JA3
+        self.JA3S = JA3S
+        self.JA3_params = JA3_params
+        self.JA3S_params = JA3S_params
+        self.client_hello = client_hello
+        self.server_hello = server_hello
+
+    def __repr__(self):
+        return "<JA3=%s, JA3S=%s>" % (self.JA3, self.JA3S)
 
 class TCPPacketStreamer(Protocol):
     """Translates TCP/IP packet streams into rich streams of stitched
@@ -279,7 +297,8 @@ class TCPStream(Protocol):
 
         if tcp.data and to_server and self.recv:
             self.parent.handle(
-                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv)
+                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv),
+                None
             )
             self.sent, self.recv = [], []
             self.ts = None
@@ -362,7 +381,8 @@ class TCPStream(Protocol):
     def finish(self):
         if self.sent or self.recv:
             self.parent.handle(
-                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv)
+                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv),
+                None
             )
 
         if self.packets:
@@ -557,7 +577,25 @@ class TLSStream(Protocol):
                         ts,
                     )
 
-            self.parent.handle(s, ts, "tls", "".join(sent), "".join(recv))
+            ja3, ja3s, ja3_p, ja3s_p = None, None, None, None
+            try:
+                ja3, ja3_p = JA3.JA3(self.client_hello.data)
+            except ValueError as e:
+                log.warning("Failed to calculate JA3: %s", e)
+
+            try:
+                ja3s, ja3s_p = JA3.JA3S(self.server_hello.data)
+            except ValueError as e:
+                log.warning("Failed to calculate JA3S: %s", e)
+
+            tlsinfo = TLSInfo(
+                JA3=ja3, JA3S=ja3s, JA3_params=ja3_p, JA3S_params=ja3s_p,
+                client_hello=self.client_hello, server_hello=self.server_hello
+            )
+
+            self.parent.handle(
+                s, ts, "tls", "".join(sent), "".join(recv), tlsinfo
+            )
             return True
 
     def state_done(self, s, ts):
@@ -576,9 +614,9 @@ class TLSStream(Protocol):
         "done": state_done,
     }
 
-    def handle(self, s, ts, protocol, sent, recv):
+    def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
         if protocol != "tcp":
-            self.parent.handle(s, ts, protocol, sent, recv)
+            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
             return
 
         try:
@@ -596,7 +634,7 @@ class TLSStream(Protocol):
         except dpkt.ssl.SSL3Exception:
             # This is not a TLS stream or we're unable to decrypt it so we
             # skip it and forward it straight ahead to our parent.
-            self.parent.handle(s, ts, protocol, sent, recv)
+            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
             return
 
         # Keep going while non-False is returned.
@@ -623,4 +661,3 @@ if 0xc009 not in _cs.ietfNames:
     _cs.aes256GcmSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)
     _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
     _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)
-

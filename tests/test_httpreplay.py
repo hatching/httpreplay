@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2019 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -30,6 +30,7 @@ class PcapTest(object):
     expected_output = None
 
     use_exceptions = True
+    tlsinfo = False
 
     @staticmethod
     def format(self, s, ts, p, sent, recv):
@@ -39,12 +40,12 @@ class PcapTest(object):
         with open(os.path.join("tests", "pcaps", self.pcapfile), "rb") as f:
             reader = PcapReader(f)
             reader.tcp = TCPPacketStreamer(reader, self.handlers)
+            reader.tlsinfo = self.tlsinfo
 
             reader.raise_exceptions = self.use_exceptions
 
             output = [
-                self.format(*stream)
-                for stream in reader.process()
+                self.format(*stream) for stream in reader.process()
             ]
 
         assert self.expected_output == output
@@ -357,7 +358,7 @@ class TestNoTLSKeys(object):
         def __init__(self):
             self.values = []
 
-        def handle(self, s, ts, protocol, sent, recv):
+        def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
             self.values.append((s, ts, protocol, sent, recv))
 
     @mock.patch("httpreplay.cobweb.HttpProtocol.parse_request")
@@ -417,3 +418,36 @@ else:
         assert hashlib.md5(open(filepath, "rb").read()).hexdigest() == (
             "667ce4057bb6cfa0082df6ca1ba40a87"
         )
+
+class TestTLSInfoJA3(PcapTest):
+    """Handle HTTP on non-default ports"""
+    pcapfile = "stream11.pcap"
+    tlsinfo = True
+
+    def _https_handler():
+        session_id = "5ab7c9537928268ba71cd5fc790b6accb29707cfa7b3f85347e432a439eb1b4b"
+        master_key = "50321cf5552ba2f3ed34cd6eee005cf6490f5d915c7db8e2cfbf54940140308aa09c0a4e94107df6b25d2509f5bf0f13"
+        return https_handler({
+            session_id.decode("hex"): master_key.decode("hex"),
+        })
+
+    handlers = {
+        443: _https_handler
+    }
+
+    def format(self, s, ts, p, sent, recv, tlsinfo):
+        print tlsinfo.JA3, tlsinfo.JA3_params, tlsinfo.JA3S, tlsinfo.JA3S_params
+        return tlsinfo.JA3, tlsinfo.JA3_params, tlsinfo.JA3S, tlsinfo.JA3S_params
+
+    expected_output = [
+        ("2201d8e006f8f005a6b415f61e677532",
+         "769,47-53-5-10-49171-49172-49161-49162-50-56-19-4,65281-0-5-10-11,23-24,0",
+         "d2e6f7ef558ea8036c7e21b163b2d1af", "769,5,0-65281")
+    ]
+
+def test_patch_dpkt_ssl_tlshello():
+    from httpreplay.misc import patch_dpkt_ssl_tlshello_unpacks
+    patch_dpkt_ssl_tlshello_unpacks()
+    assert getattr(dpkt.ssl, "parse_extensions")
+    assert dpkt.ssl.TLSClientHello.__name__ == "_TLSClientHelloPatched"
+    assert dpkt.ssl.TLSServerHello.__name__ == "_TLSServerHelloPatched"
