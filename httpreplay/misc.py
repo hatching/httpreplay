@@ -21,7 +21,10 @@ def read_tlsmaster(filepath):
 
 class JA3(object):
     """This JA3/JA3S calculation code is a modified version of the code
-    found at: https://github.com/salesforce/ja3"""
+    found at: https://github.com/salesforce/ja3
+
+    See the 'COPYRIGHT' file for copyright and license information.
+    """
 
     GREASE_TABLE = [0x0a0a, 0x1a1a, 0x2a2a, 0x3a3a,
                     0x4a4a, 0x5a5a, 0x6a6a, 0x7a7a,
