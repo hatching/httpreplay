@@ -23,6 +23,7 @@ class PcapReader(object):
         self.tcp = None
         self.udp = None
         self.values = []
+        self.tlsinfo = False
 
         # Disables exceptions raised by PcapReader while the pcap is being
         # read. If disabled, the exceptions are stored in the self.exceptions
@@ -37,7 +38,7 @@ class PcapReader(object):
         try:
             self.pcap = dpkt.pcap.Reader(fp_or_filepath)
         except ValueError as e:
-            if e.message == "invalid tcpdump header":
+            if str(e) == "invalid tcpdump header":
                 log.critical("Currently we don't support PCAP-NG files")
             self.pcap = None
 
@@ -149,8 +150,11 @@ class PcapReader(object):
         while self.values:
             yield self.values.pop(0)
 
-    def handle(self, s, ts, protocol, sent, recv):
-        self.values.append((s, ts, protocol, sent, recv))
+    def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
+        if self.tlsinfo:
+            self.values.append((s, ts, protocol, sent, recv, tlsinfo))
+        else:
+            self.values.append((s, ts, protocol, sent, recv))
 
 def inet_to_str(inet):
     try:
