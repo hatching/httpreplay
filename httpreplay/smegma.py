@@ -445,12 +445,22 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         except tlslite.errors.TLSBadRecordMAC:
             log.warning("Bad MAC record, cannot decrypt server stream.")
             return ""
+        except tlslite.errors.TLSDecryptionFailed:
+            log.warning(
+                "Invalid data length. Data modulo blocklength was not 0"
+            )
+            return ""
 
     def decrypt_client(self, record_type, buf):
         try:
             return self.decrypt(self.client_state, record_type, buf)
         except tlslite.errors.TLSBadRecordMAC:
             log.warning("Bad MAC record, cannot decrypt client stream.")
+            return ""
+        except tlslite.errors.TLSDecryptionFailed:
+            log.warning(
+                "Invalid data length. Data modulo blocklength was not 0"
+            )
             return ""
 
 class TLSStream(Protocol):
