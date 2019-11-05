@@ -13,7 +13,7 @@ setup(
     packages=[
         "httpreplay",
     ],
-    url="https://github.com/jbremer/httpreplay",
+    url="https://github.com/hatching/httpreplay",
     license="GPLv3",
     description="Properly interpret, decrypt, and replay pcap files",
     install_requires=[
