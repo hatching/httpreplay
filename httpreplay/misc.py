@@ -16,7 +16,12 @@ def read_tlsmaster(filepath):
         if x:
             sid = x.group("sid").strip()
             key = x.group("key").strip()
-            ret[sid.decode("hex")] = key.decode("hex")
+            try:
+                # In case a malformed session or key is read. Handles the
+                # odd-length string error.
+                ret[sid.decode("hex")] = key.decode("hex")
+            except TypeError:
+                continue
     return ret
 
 class JA3(object):
