@@ -14,6 +14,12 @@ from httpreplay.exceptions import (
 
 log = logging.getLogger(__name__)
 
+def inet_to_str(inet):
+    try:
+        return socket.inet_ntop(socket.AF_INET, inet)
+    except ValueError:
+        return socket.inet_ntop(socket.AF_INET6, inet)
+
 class PcapReader(object):
     """Iterates over a PCAP file and yields all interesting events after
     having each packet processed by the various callback functions that can be
@@ -123,17 +129,17 @@ class PcapReader(object):
                 except InvalidTcpPacketOrder as e:
                     log.error(
                         "Invalid TCP packet order. Ts: %s (%s -> %s). %s", ts,
-                        init_to_str(ip.src), init_to_str(ip.dst), e
+                        inet_to_str(ip.src), inet_to_str(ip.dst), e
                     )
                 except UnknownTcpSequenceNumber as e:
                     log.error(
                         "Unknown TCP sequence number. Ts: %s (%s -> %s). %s",
-                        ts, init_to_str(ip.src), init_to_str(ip.dst), e
+                        ts, inet_to_str(ip.src), inet_to_str(ip.dst), e
                     )
                 except UnexpectedTcpData as e:
                     log.error(
                         "Unexpected TCP data. Ts: %s (%s -> %s). %s", ts,
-                        init_to_str(ip.src), init_to_str(ip.dst), e
+                        inet_to_str(ip.src), inet_to_str(ip.dst), e
                     )
 
             if isinstance(packet, dpkt.udp.UDP):
@@ -155,9 +161,3 @@ class PcapReader(object):
             self.values.append((s, ts, protocol, sent, recv, tlsinfo))
         else:
             self.values.append((s, ts, protocol, sent, recv))
-
-def inet_to_str(inet):
-    try:
-        return socket.inet_ntop(socket.AF_INET, inet)
-    except ValueError:
-        return socket.inet_ntop(socket.AF_INET6, inet)
