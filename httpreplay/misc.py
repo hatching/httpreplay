@@ -6,22 +6,27 @@ import dpkt
 import hashlib
 import re
 import struct
+import binascii
 
-tlsmaster = "RSA Session-ID:(?P<sid>[0-9a-f]+) Master-Key:(?P<key>[0-9a-f]+)"
+_hexdecode = binascii.a2b_hex
+
+tlsmaster1 = "RSA Session-ID:(?P<sid>[0-9a-f]+) Master-Key:(?P<key>[0-9a-f]+)"
+tlsmaster2 = "CLIENT_RANDOM (?P<sid>[0-9a-f]+) (?P<key>[0-9a-f]+)"
 
 def read_tlsmaster(filepath):
     ret = {}
-    for line in open(filepath, "rb"):
-        x = re.match(tlsmaster, line)
+    for line in open(filepath, "r"):
+        x = re.match(tlsmaster1, line)
         if x:
             sid = x.group("sid").strip()
             key = x.group("key").strip()
-            try:
-                # In case a malformed session or key is read. Handles the
-                # odd-length string error.
-                ret[sid.decode("hex")] = key.decode("hex")
-            except TypeError:
-                continue
+            ret[_hexdecode(sid)[0]] = _hexdecode(key)[0]
+        x = re.match(tlsmaster2, line)
+        if x:
+            sid = x.group("sid").strip()
+            key = x.group("key").strip()
+
+            ret[_hexdecode(sid)] = _hexdecode(key)
     return ret
 
 class JA3(object):

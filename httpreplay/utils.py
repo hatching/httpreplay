@@ -6,6 +6,7 @@ import hashlib
 import logging
 import io
 import uuid
+import binascii
 
 from httpreplay.cut import http_handler, https_handler
 from httpreplay.misc import read_tlsmaster
@@ -16,14 +17,12 @@ log = logging.getLogger(__name__)
 
 def pcap2mitm(pcapfile, mitmfile, tlsmaster=None, stream=False):
     try:
-        from mitmproxy import models
-        from mitmproxy.flow import FlowWriter
-        from netlib.exceptions import HttpException
-        from netlib.http import http1
-    except ImportError:
+        from mitmproxy import io as mitm_io, http, connections, exceptions
+        from mitmproxy.net.http import http1
+    except ImportError as e:
         log.warning(
             "In order to use this utility it is required to have the "
-            "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`)"
+            "mitmproxy tool installed (`pip install httpreplay[mitmproxy]`) : Error is '%s'", e
         )
         return False
 
@@ -40,7 +39,7 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster=None, stream=False):
 
     reader = PcapReader(pcapfile)
     reader.tcp = TCPPacketStreamer(reader, handlers)
-    writer = FlowWriter(mitmfile)
+    writer = mitm_io.FlowWriter(mitmfile)
 
     l = reader.process()
     if not stream:
@@ -53,24 +52,24 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster=None, stream=False):
 
         srcip, srcport, dstip, dstport = s
 
-        client_conn = models.ClientConnection.make_dummy((srcip, srcport))
+        client_conn = connections.ClientConnection.make_dummy((srcip, srcport))
         client_conn.timestamp_start = ts
 
-        server_conn = models.ServerConnection.make_dummy((dstip, dstport))
+        server_conn = connections.ServerConnection.make_dummy((dstip, dstport))
         server_conn.timestamp_start = ts
 
-        flow = models.HTTPFlow(client_conn, server_conn)
+        flow = http.HTTPFlow(client_conn, server_conn)
 
         try:
             sent = io.BytesIO(sent.raw)
             request = http1.read_request_head(sent)
             body_size = http1.expected_http_body_size(request)
-            request.data.content = "".join(http1.read_body(sent, body_size, None))
-        except HttpException as e:
+            request.data.content = b"".join(http1.read_body(sent, body_size, None))
+        except exceptions.HttpException as e:
             log.warning("Error parsing HTTP request: %s", e)
             continue
 
-        flow.request = models.HTTPRequest.wrap(request)
+        flow.request = http.HTTPRequest.wrap(request)
         flow.request.timestamp_start = client_conn.timestamp_start
 
         flow.request.host = dstip
@@ -81,18 +80,18 @@ def pcap2mitm(pcapfile, mitmfile, tlsmaster=None, stream=False):
             recv = io.BytesIO(recv.raw)
             response = http1.read_response_head(recv)
             body_size = http1.expected_http_body_size(request, response)
-            response.data.content = "".join(http1.read_body(recv, body_size, None))
-        except HttpException as e:
+            response.data.content = b"".join(http1.read_body(recv, body_size, None))
+        except exceptions.HttpException as e:
             log.warning("Error parsing HTTP response: %s", e)
             # Fall through (?)
 
-        flow.response = models.HTTPResponse.wrap(response)
+        flow.response = http.HTTPResponse.wrap(response)
         flow.response.timestamp_start = server_conn.timestamp_start
 
-        flow.id = str(uuid.UUID(bytes=hashlib.md5("%d%d%s%s" % (
+        flow.id = uuid.UUID(bytes=hashlib.md5(b"%d%d%s%s" % (
             client_conn.timestamp_start, server_conn.timestamp_start,
             request.data.content, response.data.content
-        )).digest()))
+        )).digest())
 
         writer.add(flow)
     return True

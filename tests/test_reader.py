@@ -18,7 +18,7 @@ def test_unknownDatalinkException():
         struct.pack(
             "IHHIIII", dpkt.pcap.TCPDUMP_MAGIC, dpkt.pcap.PCAP_VERSION_MAJOR,
             dpkt.pcap.PCAP_VERSION_MINOR, 0, 0, 1500, 0
-        ) + "A"*16
+        ) + b"A"*16
     ))
     with pytest.raises(UnknownDatalink):
         list(r.process())
@@ -85,7 +85,7 @@ class TestNoExceptionsUnknownDatalink(PcapTest):
     pcapdata = struct.pack(
         "IHHIIII", dpkt.pcap.TCPDUMP_MAGIC, dpkt.pcap.PCAP_VERSION_MAJOR,
         dpkt.pcap.PCAP_VERSION_MINOR, 0, 0, 1500, 0
-    ) + "A"*16
+    ) + b"A"*16
 
     expected_output = [
         UnknownDatalink,

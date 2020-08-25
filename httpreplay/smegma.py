@@ -19,7 +19,7 @@ patch_dpkt_ssl_tlshello_unpacks()
 
 log = logging.getLogger(__name__)
 
-class Packet(str):
+class Packet(bytes):
     ts = None
 
 class TLSInfo(object):
@@ -53,7 +53,8 @@ class TCPPacketStreamer(Protocol):
             handler = handler.parent
         handler.parent = self.parent
 
-    def handler(self, (srcip, srcport, dstip, dstport)):
+    def handler(self, sn):
+        (srcip, srcport, dstip, dstport) = sn
         if srcport in self.handlers:
             return self.handlers[srcport]
         elif dstport in self.handlers:
@@ -297,12 +298,13 @@ class TCPStream(Protocol):
 
         if tcp.data and to_server and self.recv:
             self.parent.handle(
-                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv),
-                None
+                self.s, self.ts, "tcp", b"".join(self.sent),
+                b"".join(self.recv), None
             )
             self.sent, self.recv = [], []
             self.ts = None
 
+        # Switch bytes to str
         packet = Packet(tcp.data)
         packet.ts = ts
 
@@ -381,8 +383,8 @@ class TCPStream(Protocol):
     def finish(self):
         if self.sent or self.recv:
             self.parent.handle(
-                self.s, self.ts, "tcp", "".join(self.sent), "".join(self.recv),
-                None
+                self.s, self.ts, "tcp", b"".join(self.sent),
+                b"".join(self.recv), None
             )
 
         if self.packets:
@@ -427,15 +429,15 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
     def decrypt(self, state, record_type, buf):
         self._recordLayer._readState = state
         if state.encContext.isBlockCipher:
-            return str(self._recordLayer._decryptThenMAC(
+            return bytes(self._recordLayer._decryptThenMAC(
                 record_type, bytearray(buf)
             ))
         elif state.encContext.isAEAD:
-            return str(self._recordLayer._decryptAndUnseal(
+            return bytes(self._recordLayer._decryptAndUnseal(
                 record_type, bytearray(buf)
             ))
         else:
-            return str(self._recordLayer._decryptStreamThenMAC(
+            return bytes(self._recordLayer._decryptStreamThenMAC(
                 record_type, bytearray(buf)
             ))
 
@@ -472,8 +474,8 @@ class TLSStream(Protocol):
         self.tls = _TLSStream(None)
         self.sent = []
         self.recv = []
-        self.raw_sent = ""
-        self.raw_recv = ""
+        self.raw_sent = b""
+        self.raw_recv = b""
 
     def parse_record(self, record):
         if record.type not in dpkt.ssl.RECORD_TYPES:
@@ -509,12 +511,17 @@ class TLSStream(Protocol):
         client_random = self.client_hello.data.random
         server_random = self.server_hello.data.random
 
-        # The master secret can be obtained through the session id as well
-        # as a (client random, server random) tuple.
+        # The master secret can be obtained through the session id or
+        # a (client random, server random) tuple or the client random only.
         if self.server_hello.data.session_id in self.secrets:
             master_secret = self.secrets[self.server_hello.data.session_id]
+            log.debug("Master Secret: Session id found")
+        elif client_random in self.secrets:
+            master_secret = self.secrets[client_random]
+            log.debug("Master Secret: Client random found")
         elif (client_random, server_random) in self.secrets:
             master_secret = self.secrets[client_random, server_random]
+            log.debug("Master Secret: (client_random, server_random) found")
         else:
             log.info("Could not find TLS master secret for stream "
                      "%s:%d -> %s:%d, skipping it.", *s)
@@ -587,6 +594,12 @@ class TLSStream(Protocol):
                         ts,
                     )
 
+            if not isinstance(sent[0], bytes):
+                sent = [ord(c) if len(c) != 0 else b"" for c in sent]
+
+            if not isinstance(recv[0], bytes):
+                recv = [ord(c) if len(c) != 0 else b"" for c in recv]
+
             ja3, ja3s, ja3_p, ja3s_p = None, None, None, None
             try:
                 ja3, ja3_p = JA3.JA3(self.client_hello.data)
@@ -604,7 +617,7 @@ class TLSStream(Protocol):
             )
 
             self.parent.handle(
-                s, ts, "tls", "".join(sent), "".join(recv), tlsinfo
+                s, ts, "tls", b"".join(sent), b"".join(recv), tlsinfo
             )
             return True
 

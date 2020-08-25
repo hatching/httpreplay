@@ -2,6 +2,7 @@
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
+from past.builtins import basestring
 import dpkt
 import logging
 import socket
@@ -68,7 +69,8 @@ class PcapReader(object):
             return
 
         for ts, packet in self.pcap:
-            if isinstance(packet, str):
+
+            if isinstance(packet, bytes):
                 if self.pcap.datalink() == dpkt.pcap.DLT_EN10MB:
                     packet = self._parse_ethernet(packet)
                 elif self.pcap.datalink() == 101:

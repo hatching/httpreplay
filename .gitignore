@@ -1,6 +1,13 @@
+*.egg-info
+*.pyc
+*.pcap
+.cache/
+.pytest_cache/
+.idea/
 # ---> Python
 # Byte-compiled / optimized / DLL files
-__pycache__/
+__.pcap
+pycache__/
 *.py[cod]
 *$py.class
 

@@ -1,15 +1,16 @@
 language: python
 
 python:
-    - 2.7
+    - 3.6
 
 install:
     - pip install -e .
     - pip install mock pytest==4.4.1 pytest-cov coveralls
 
 script:
+    - pip3 install '.[dev]'
     - py.test --cov=httpreplay
-    - pip install '.[mitmproxy]'
+    - pip3 install '.[mitmproxy]'
     - py.test --cov=httpreplay --cov-append
 
 after_success:
