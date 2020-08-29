@@ -17,9 +17,9 @@ setup(
     license="GPLv3",
     description="Properly interpret, decrypt, and replay pcap files",
     install_requires=[
-        "dpkt==1.9.2",
+        "dpkt>=1.9.3, <1.10",
         "tlslite-ng==0.7.5",
-        "click>=6.7, <7",
+        "click>=7.1.2, <7.2",
         "brotli==1.0.7",
         "future",
     ],

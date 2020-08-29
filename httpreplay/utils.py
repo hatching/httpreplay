@@ -6,12 +6,11 @@ import hashlib
 import logging
 import io
 import uuid
-import binascii
 
-from httpreplay.cut import http_handler, https_handler
+from httpreplay.protohandlers import http_handler, https_handler
 from httpreplay.misc import read_tlsmaster
 from httpreplay.reader import PcapReader
-from httpreplay.smegma import TCPPacketStreamer
+from httpreplay.transport import TCPPacketStreamer
 
 log = logging.getLogger(__name__)
 

@@ -12,14 +12,14 @@ import pytest
 import tempfile
 import binascii
 
-from httpreplay.cobweb import parse_body, HttpProtocol
+from httpreplay.protoparsers import parse_body, HttpProtocol
 from httpreplay.main import do_pcap2mitm
 from httpreplay.misc import read_tlsmaster
 from httpreplay.reader import PcapReader
-from httpreplay.cut import (
+from httpreplay.protohandlers import (
     http_handler, https_handler, smtp_handler, dummy_handler, forward_handler
 )
-from httpreplay.smegma import TCPPacketStreamer
+from httpreplay.transport import TCPPacketStreamer
 from httpreplay.utils import pcap2mitm
 
 log = logging.getLogger(__name__)
@@ -78,8 +78,8 @@ class TestNoResponse(PcapTest):
         return sent.method, sent.uri, recv.raw
 
     expected_output = [
-        ("POST", "/cmd.php", ""),
-        ("GET", "/cmd.php", ""),
+        ("POST", "/cmd.php", b""),
+        ("GET", "/cmd.php", b""),
     ]
 
 class TestEmptyRequest(PcapTest):
@@ -95,8 +95,8 @@ class TestEmptyRequest(PcapTest):
         return s[0], sent, recv
 
     expected_output = [
-        ("172.16.165.133", "", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
-        ("172.16.165.133", "", "220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
+        ("172.16.165.133", b"", b"220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
+        ("172.16.165.133", b"", b"220 mx.google.com ESMTP v9si4604526wah.36\r\n"),
     ]
 
 class TestCutoff(PcapTest):
@@ -289,7 +289,7 @@ class TestWeirdRetransmission(PcapTest):
         "/jmx-console/filterView.jsp",
         "/jmx-console/images/newlogo.gif",
         "/favicon.ico",
-        "\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00\x00"
     ]
 
 class TestClientSideInvalidTcpPacketOrder(PcapTest):
@@ -363,7 +363,7 @@ class TestNoTLSKeys(object):
         def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
             self.values.append((s, ts, protocol, sent, recv))
 
-    @mock.patch("httpreplay.cobweb.HttpProtocol.parse_request")
+    @mock.patch("httpreplay.protoparsers.HttpProtocol.parse_request")
     def test_no_tls_keys(self, p):
         h = https_handler()
         h.parent.parent = dummy = self.DummyProtocol()
@@ -491,10 +491,3 @@ class TestTLSInfoJA3(PcapTest):
          "769,47-53-5-10-49171-49172-49161-49162-50-56-19-4,65281-0-5-10-11,23-24,0",
          "d2e6f7ef558ea8036c7e21b163b2d1af", "769,5,0-65281")
     ]
-
-def test_patch_dpkt_ssl_tlshello():
-    from httpreplay.misc import patch_dpkt_ssl_tlshello_unpacks
-    patch_dpkt_ssl_tlshello_unpacks()
-    assert getattr(dpkt.ssl, "parse_extensions")
-    assert dpkt.ssl.TLSClientHello.__name__ == "_TLSClientHelloPatched"
-    assert dpkt.ssl.TLSServerHello.__name__ == "_TLSServerHelloPatched"

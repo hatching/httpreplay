@@ -5,9 +5,9 @@
 import os
 
 from httpreplay.reader import PcapReader
-from httpreplay.smegma import TCPPacketStreamer, TLSStream
-from httpreplay.cut import smtp_handler
-from httpreplay.cobweb import SmtpProtocol
+from httpreplay.transport import TCPPacketStreamer, TLSStream
+from httpreplay.protohandlers import smtp_handler
+from httpreplay.protoparsers import SmtpProtocol
 
 class SmtpTest(object):
     handlers = {

@@ -12,7 +12,7 @@ import re
 import base64
 
 from httpreplay.exceptions import UnknownHttpEncoding
-from httpreplay.shoddy import Protocol
+from httpreplay.abstracts import Protocol
 
 log = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ def parse_body(f, headers):
         body = f.read()
     else:
         # XXX - need to handle HTTP/0.9
-        body = ""
+        body = b""
 
     return body
 
@@ -137,7 +137,7 @@ class _Request(object):
     """Dummy HTTP request object which only has the raw paremeter set."""
 
     def __init__(self, raw):
-        self.raw = bytes_to_str(raw)
+        self.raw = raw
         self.body = None
 
     def __str__(self):
@@ -147,7 +147,7 @@ class _Response(object):
     """Dummy HTTP response object which only has the raw paremeter set."""
 
     def __init__(self, raw):
-        self.raw = bytes_to_str(raw)
+        self.raw = raw
         self.body = None
 
     def __str__(self):
@@ -240,7 +240,7 @@ class HttpProtocol(Protocol):
             # This wasn't a valid HTTP stream so we forward the original TCP
             # or TLS stream straight ahead to our parent.
             self.parent.handle(
-                s, ts, protocol, bytes_to_str(sent), bytes_to_str(recv),
+                s, ts, protocol, sent, recv,
                 tlsinfo
             )
 
@@ -249,7 +249,6 @@ class HttpsProtocol(HttpProtocol):
 
     def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
         if protocol != "tls":
-            print(f"Type: {self.parent}")
             return self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
 
         super(HttpsProtocol, self).handle(s, ts, protocol, sent, recv, tlsinfo)

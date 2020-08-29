@@ -10,12 +10,8 @@ import tlslite
 from httpreplay.exceptions import (
     UnknownTcpSequenceNumber, UnexpectedTcpData, InvalidTcpPacketOrder,
 )
-from httpreplay.shoddy import Protocol
-from httpreplay.misc import JA3, patch_dpkt_ssl_tlshello_unpacks
-
-# Patch dpkt v1.8.7 to support reading TLShello extensions. See method
-# description for further info.
-patch_dpkt_ssl_tlshello_unpacks()
+from httpreplay.abstracts import Protocol
+from httpreplay.misc import JA3
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +30,47 @@ class TLSInfo(object):
 
     def __repr__(self):
         return "<JA3=%s, JA3S=%s>" % (self.JA3, self.JA3S)
+
+class UDPPacketStreamer(Protocol):
+
+    def init(self, handlers):
+        self.handlers = handlers
+
+    def stream(self, ip, transport, reverse=False):
+        return (
+            socket.inet_ntoa(ip.dst), transport.dport,
+            socket.inet_ntoa(ip.src), transport.sport,
+        ) if reverse else (
+            socket.inet_ntoa(ip.src), transport.sport,
+            socket.inet_ntoa(ip.dst), transport.dport,
+        )
+
+    def init_handler(self, handler):
+        while handler.parent:
+            handler = handler.parent
+        handler.parent = self.parent
+
+    def handler(self, stream):
+        # Srcport
+        if stream[1] in self.handlers:
+            return self.handlers[stream[1]]
+        # dstport
+        elif stream[3] in self.handlers:
+            return self.handlers[stream[3]]
+        elif "generic" in self.handlers:
+            return self.handlers["generic"]
+
+        return Protocol
+
+    def process(self, ts, ip, packet):
+        stream = self.stream(ip, packet)
+        handler = self.handler(stream)()
+        self.init_handler(handler)
+
+        handler.handle(stream, ts, "udp", packet.data, None, None)
+
+    def finish(self):
+        pass
 
 class TCPPacketStreamer(Protocol):
     """Translates TCP/IP packet streams into rich streams of stitched
@@ -64,7 +101,7 @@ class TCPPacketStreamer(Protocol):
 
         # Returning the abstract Protocol class here so all packets will
         # end up in nowhere but at least there will still be a parent.
-        log.warning("Unhandled protocol port=%s/%s", srcport, dstport)
+        log.error("Unhandled protocol port=%s/%s", srcport, dstport)
         return Protocol
 
     def stream(self, ip, tcp, reverse=False):
@@ -664,23 +701,23 @@ class TLSStream(Protocol):
         while self.states[self.state](self, s, ts):
             pass
 
-# Until our pull request (https://github.com/tomato42/tlslite-ng/pull/96) is
-# accepted we're going to monkey patch tlslite to contain our desired changes.
-_cs = tlslite.constants.CipherSuite
-if 0xc009 not in _cs.ietfNames:
-    _cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA = 0xC009
-    _cs.ietfNames[0xC009] = "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"
-    _cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA = 0xC00A
-    _cs.ietfNames[0xC00A] = "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"
-    _cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 = 0xC02B
-    _cs.ietfNames[0xC02B] = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
-    _cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 = 0xC02C
-    _cs.ietfNames[0xC02C] = "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
-    _cs.aes128Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
-    _cs.aes256Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
-    _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
-    _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
-    _cs.aes128GcmSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
-    _cs.aes256GcmSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)
-    _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
-    _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)
+# # Until our pull request (https://github.com/tomato42/tlslite-ng/pull/96) is
+# # accepted we're going to monkey patch tlslite to contain our desired changes.
+# _cs = tlslite.constants.CipherSuite
+# if 0xc009 not in _cs.ietfNames:
+#     _cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA = 0xC009
+#     _cs.ietfNames[0xC009] = "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA"
+#     _cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA = 0xC00A
+#     _cs.ietfNames[0xC00A] = "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA"
+#     _cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 = 0xC02B
+#     _cs.ietfNames[0xC02B] = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
+#     _cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 = 0xC02C
+#     _cs.ietfNames[0xC02C] = "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
+#     _cs.aes128Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
+#     _cs.aes256Suites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
+#     _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA)
+#     _cs.shaSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA)
+#     _cs.aes128GcmSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
+#     _cs.aes256GcmSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)
+#     _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256)
+#     _cs.aeadSuites.append(_cs.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384)

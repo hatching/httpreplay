@@ -3,8 +3,8 @@
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
-from .cobweb import HttpProtocol, SmtpProtocol
-from .cut import (
+from .protoparsers import HttpProtocol, SmtpProtocol
+from .protohandlers import (
     ForwardProtocol, dummy_handler, forward_handler, http_handler,
     https_handler, tls_handler, smtp_handler,
 )
@@ -15,7 +15,7 @@ from .exceptions import (
 )
 from .misc import read_tlsmaster
 from .reader import PcapReader
-from .shoddy import Protocol
-from .smegma import Packet, TCPPacketStreamer, TCPStream, TLSStream
+from .abstracts import Protocol
+from .transport import Packet, TCPPacketStreamer, TCPStream, TLSStream
 
-__version__ = "0.2.6"
+__version__ = "0.3"
