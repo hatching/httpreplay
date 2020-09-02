@@ -14,9 +14,6 @@ from httpreplay.exceptions import (
 )
 
 log = logging.getLogger(__name__)
-loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
-for logger in loggers:
-    logger.setLevel(logging.ERROR)
 
 def inet_to_str(inet):
     try:
