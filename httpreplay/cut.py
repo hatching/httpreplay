@@ -3,6 +3,7 @@
 # See the file 'LICENSE' for copying permission.
 
 import httpreplay.cobweb
+from httpreplay.cobweb import bytes_to_str
 import httpreplay.reader
 import httpreplay.shoddy
 import httpreplay.smegma
@@ -11,7 +12,7 @@ class ForwardProtocol(httpreplay.shoddy.Protocol):
     """Forwards the received packets up the ladder for raw interpretation."""
 
     def handle(self, s, ts, protocol, sent, recv):
-        self.parent.handle(s, ts, protocol, sent, recv)
+        self.parent.handle(s, ts, protocol, bytes_to_str(sent), bytes_to_str(recv))
 
 def dummy_handler():
     """Dummy Protocol handler that forwards packets to /dev/null."""
