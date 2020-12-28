@@ -33,9 +33,10 @@ class PcapTest(object):
     expected_output = None
 
     use_exceptions = True
+    tlsinfo = False
 
     @staticmethod
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         raise NotImplementedError
 
     def test_pcap(self):
@@ -56,7 +57,7 @@ class TestSimple(PcapTest):
     """"Tests TCP reassembly and basic HTTP extraction"""
     pcapfile = "test.pcap"
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return ts, sent.uri, len(recv.body or "")
 
     expected_output = [
@@ -74,7 +75,7 @@ class TestNoResponse(PcapTest):
     """Extracts HTTP requests which have no response"""
     pcapfile = "2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap"
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return sent.method, sent.uri, recv.raw
 
     expected_output = [
@@ -91,7 +92,7 @@ class TestEmptyRequest(PcapTest):
         80: dummy_handler,
     }
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return s[0], sent, recv
 
     expected_output = [
@@ -103,7 +104,7 @@ class TestCutoff(PcapTest):
     """Extracts HTTP response cut off during transmission"""
     pcapfile = "2014-12-13-download.pcap"
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return sent.uri, int(recv.headers["content-length"]), len(recv.body)
 
     expected_output = [
@@ -125,7 +126,7 @@ class TestRetransmission(PcapTest):
     def test_pcap(self):
         TestRetransmission.test_pcap(self)
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return s, sent.__class__.__name__
 
     expected_output = [
@@ -148,7 +149,7 @@ class TestSpuriousRetransmission(PcapTest):
     """Handles TCP Spurious Retransmission logic"""
     pcapfile = "2015-10-08-Nuclear-EK-example-2-traffic.pcap"
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return sent.uri
 
     expected_output = [
@@ -173,7 +174,7 @@ class TestIgmpAndHttp(PcapTest):
     """Handle IGMP packets and HTTP on port 80"""
     pcapfile = "2015-10-13-Neutrino-EK-traffic-second-run.pcap"
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return sent.method, sent.uri
 
     expected_output = (
@@ -195,7 +196,7 @@ class TestHttpNoDefaultPort(PcapTest):
         "generic": http_handler,
     }
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return sent.method, sent.uri
 
     expected_output = [
@@ -214,7 +215,7 @@ class TestCaptureNotAcked(PcapTest):
         443: dummy_handler,
     }
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         if isinstance(recv, dpkt.http.Response):
             return hashlib.md5(recv.body).hexdigest()
 
@@ -249,7 +250,7 @@ class TestCaptureNotAcked2(PcapTest):
     """Extracts HTTP requests which are not acknowledged"""
     pcapfile = "EK_MALWARE_2014-09-29-Nuclear-EK-traffic_mailware-traffic-analysis.net.pcap"
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         # Only handle one particular stream.
         if s[1] != 49837 and s[3] != 49837:
             return
@@ -281,7 +282,7 @@ class TestWeirdRetransmission(PcapTest):
         8080: http_handler
     }
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return getattr(sent, "uri", sent)
 
     expected_output = [
@@ -300,7 +301,7 @@ class TestClientSideInvalidTcpPacketOrder(PcapTest):
         80: http_handler,
     }
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return len(sent.raw), len(recv.raw)
 
     expected_output = [
@@ -321,7 +322,7 @@ class TestTLSWithRC4(PcapTest):
         443: _https_handler,
     }
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return getattr(sent, "uri", sent)
 
     expected_output = [
@@ -338,7 +339,7 @@ class TestNoGzipBody(PcapTest):
             binascii.a2b_hex(session_id): binascii.a2b_hex(master_key),
         })
 
-    def format(self, s, ts, p, sent, recv):
+    def format(self, s, ts, p, sent, recv, tlsinfo=None):
         return getattr(sent, "uri", sent)
 
     handlers = {
@@ -371,7 +372,7 @@ class TestNoTLSKeys(object):
 
         p.assert_not_called()
         assert dummy.values == [
-            ((0, 0, 0, 0), 0, "tcp", b"foo\r\n", "bar"),
+            ((0, 0, 0, 0), 0, "tcp", b"foo\r\n", "bar", None),
         ]
 
 def test_read_chunked():
@@ -454,7 +455,7 @@ else:
         )
         # Note : This assert needed to be changed. Due to the new version of mitmproxy (4.0.4 when tested), a random uuid is generated for each client/server connection.
         # Because of that, the MD5 of the temporary file always change so a new test (less performant) is provided (check the size of the output file)
-        assert os.stat(filepath).st_size == 374568
+        assert os.stat(filepath).st_size == 376311
 
     def test_pcap2mitm():
         filepath = tempfile.mktemp()
@@ -464,7 +465,7 @@ else:
         )
         # Note : This assert needed to be changed. Due to the new version of mitmproxy (4.0.4 when tested), a random uuid is generated for each client/server connection.
         # Because of that, the MD5 of the temporary file always change so a new test (less performant) is provided (check the size of the output file)
-        assert os.stat(filepath).st_size == 374568
+        assert os.stat(filepath).st_size == 376311
 
 class TestTLSInfoJA3(PcapTest):
     """Handle HTTP on non-default ports"""
@@ -474,8 +475,7 @@ class TestTLSInfoJA3(PcapTest):
     def _https_handler():
         session_id = "5ab7c9537928268ba71cd5fc790b6accb29707cfa7b3f85347e432a439eb1b4b"
         master_key = "50321cf5552ba2f3ed34cd6eee005cf6490f5d915c7db8e2cfbf54940140308aa09c0a4e94107df6b25d2509f5bf0f13"
-        return https_handler({
-            session_id.decode("hex"): master_key.decode("hex"),
+        return https_handler({binascii.a2b_hex(session_id): binascii.a2b_hex(master_key),
         })
 
     handlers = {
