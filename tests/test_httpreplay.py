@@ -42,12 +42,12 @@ class PcapTest(object):
         with open(os.path.join("tests", "pcaps", self.pcapfile), "rb") as f:
             reader = PcapReader(f)
             reader.tcp = TCPPacketStreamer(reader, self.handlers)
+            reader.tlsinfo = self.tlsinfo
 
             reader.raise_exceptions = self.use_exceptions
 
             output = [
-                self.format(*stream)
-                for stream in reader.process()
+                self.format(*stream) for stream in reader.process()
             ]
 
         assert len(self.expected_output) == len(output) and sorted(self.expected_output,key=lambda x: "" if x is None else str(x)) == sorted(output,key=lambda x: "" if x is None else str(x))
@@ -360,8 +360,8 @@ class TestNoTLSKeys(object):
         def __init__(self):
             self.values = []
 
-        def handle(self, s, ts, protocol, sent, recv):
-            self.values.append((s, ts, protocol, sent, recv))
+        def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
+            self.values.append((s, ts, protocol, sent, recv, tlsinfo))
 
     @mock.patch("httpreplay.cobweb.HttpProtocol.parse_request")
     def test_no_tls_keys(self, p):
@@ -405,7 +405,7 @@ def test_br_encoding():
 
     response2 = response + b'\x1b.\x00\x00\xc4\xda\xb9+\xc3~V\xdbg\xd9M\xb4\x7f\xa2W\x92\xfa/\xa4$\xb0`U\xc4\x95"\xa4\x08\x0e\xc6\xa8;\x7fXz\x86K&\xd0\x13{\x9b\xbc\xb0x\x07'
     assert HttpProtocol().parse_response(0, response2).body == b'Th1s !s a fUnNy t3xt w1th sp*ecial characters\r\n'
-  
+
     response3 = response + b'\x83b\t\x00\xe4\x98\xce\xf6.\x13[\x95?I\xfc\x15\x12x\x97-\x9f\x1aU=\xfe\xdei{\xd87j\xe33n\xacIc\xe2X4&\x05^\xa2\x01\x05\x12HD\x01\x86vw\x0f\x03\xc5@@vW\xf6\x92\xbf\x02\rQ\xee\x17n4r\xa5\xec\xecV\xa2\x01\x95\xab?\x83\x9f-;\xe2X\x11"ya\xecF\xfbTT\x9fg\x9d\x89x/&\xcb\xeai\xf5@7\x8a\xa9\xe8F\xa4J\xb0\xefF\xa9\xf0\x11\xed\xf1rQ\xa6\xa2\xcf.j\xed\xf9D\xbcuz\xebQ\xb1\xa8\xd6[\xdaol\xe5\xe6\xa3\xcc\xfd\xb3\xae\xbf\xfd\xcd\xe5I\x0fY\x80|~\t\xc3\xf4\xcee1Y\xc2\x86B\x18w\xc6\xf1oq\xbd$\x0e\x1f\xdd\xdfL+\xf9i\xbf\xef\xf0\xff\xbf\x1c\x9el\xa7\xdd.\xd7o\xaf\x19\x8f\x8bU\xadZ\xca\xbft\x18\t\xb1\x9e8&\t\xc9\xfbI*>\x9b\xe8\x87(1`\xdb\xb2M\x94\xc5\x02eq\xdcf\xd4~\xfednPrn\xeb2\xa9\xd0o\xa80Q\xeb\xd6\xb0\x91\xd6\xb0]\x00lB\xe6\x10\xc0\xac?\xff\xc4\xa8\xf5\x83:\xfa\x89\xd2%$\xd1R\xdde\xa2\x10c\xe0V\x97_e8\x91\x9e8P\x93\xbd!k-%\x0e!\xc4\xf6kfB/2\xa27\xb1q\x9d\xd5\xa4\xb8;\x90C\x02O\x7f\x9b\x08\xb9M\xe8\xb5J\xa8\t\x134\xefU\xc9()\x90\xb1I\x97Qi\x90\x81U4\xaf\xcc\x88W\x0f|\xafl"\xfb\x0b\xb3\x02\x07\xd4\xf2d\xe6\xce\xa4Y9\xf87B\x83\xf95\x85\xd2M\xe9\x12\xe2<\x99\xd5e%\xf2\xd4YX\xc8\xa2\n\x8b*b\x94*\x9a\x86\x03\xf8yd\x0e\x17\xfd\x9d\xce\x8d#w\x1d\xda&y\x94\x1f\x0f&hY`b\xad\x9b\xac\xb3\x12\xc5,T\xfa\\\x05\xaa\xf9w\x1e\xba\x921\x1cS\xfa\xc8\x0f\xd6\xd0$f\x1d\\5\xf9dp<\xb5\x98XJ\x82\x94\x1d\xd3\xf7\xac\xb5\xf9\n\x1f\xe0\xbc\xe2r\xf8\xe0{g\xec\xf4t\xd4\xb6\xb6\xaa\x9f4p\x14\xfce<\xb9\xc5\xf0\xf9G\xf6g\xcf\xf3r\xbb\x8a\x08\xcc\xac\xbf\xd6Tl]Q1\xc1\x9e\x98&\x86m,"8\xb1\xfd\xec\xa0\xd9\xd2\xa2b\x82:5,2\xb6\xb7\xa8\xa0\xe9\xf1g\xba\xb7\xba\xa8\x98\xe7Ek.\xd8\xf62\x00\x03'
     assert HttpProtocol().parse_response(0, response3).body[:30] == b"/* cyrillic-ext */\n@font-face "
 
@@ -430,7 +430,7 @@ def test_tlsmaster_client_random():
 
     reader = PcapReader(pcapfile)
     reader.tcp = TCPPacketStreamer(reader, handlers)
-    
+
     res = []
 
     (s, ts, protocol, sent, recv) = next(reader.process())
@@ -465,3 +465,36 @@ else:
         # Note : This assert needed to be changed. Due to the new version of mitmproxy (4.0.4 when tested), a random uuid is generated for each client/server connection.
         # Because of that, the MD5 of the temporary file always change so a new test (less performant) is provided (check the size of the output file)
         assert os.stat(filepath).st_size == 374568
+
+class TestTLSInfoJA3(PcapTest):
+    """Handle HTTP on non-default ports"""
+    pcapfile = "stream11.pcap"
+    tlsinfo = True
+
+    def _https_handler():
+        session_id = "5ab7c9537928268ba71cd5fc790b6accb29707cfa7b3f85347e432a439eb1b4b"
+        master_key = "50321cf5552ba2f3ed34cd6eee005cf6490f5d915c7db8e2cfbf54940140308aa09c0a4e94107df6b25d2509f5bf0f13"
+        return https_handler({
+            session_id.decode("hex"): master_key.decode("hex"),
+        })
+
+    handlers = {
+        443: _https_handler
+    }
+
+    def format(self, s, ts, p, sent, recv, tlsinfo):
+        print(tlsinfo.JA3, tlsinfo.JA3_params, tlsinfo.JA3S, tlsinfo.JA3S_params)
+        return tlsinfo.JA3, tlsinfo.JA3_params, tlsinfo.JA3S, tlsinfo.JA3S_params
+
+    expected_output = [
+        ("2201d8e006f8f005a6b415f61e677532",
+         "769,47-53-5-10-49171-49172-49161-49162-50-56-19-4,65281-0-5-10-11,23-24,0",
+         "d2e6f7ef558ea8036c7e21b163b2d1af", "769,5,0-65281")
+    ]
+
+def test_patch_dpkt_ssl_tlshello():
+    from httpreplay.misc import patch_dpkt_ssl_tlshello_unpacks
+    patch_dpkt_ssl_tlshello_unpacks()
+    assert getattr(dpkt.ssl, "parse_extensions")
+    assert dpkt.ssl.TLSClientHello.__name__ == "_TLSClientHelloPatched"
+    assert dpkt.ssl.TLSServerHello.__name__ == "_TLSServerHelloPatched"

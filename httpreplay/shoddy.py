@@ -10,5 +10,5 @@ class Protocol(object):
     def init(self, *args, **kwargs):
         pass
 
-    def handle(self, s, ts, protocol, sent, recv):
+    def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
         pass

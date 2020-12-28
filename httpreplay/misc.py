@@ -1,4 +1,4 @@
-# Copyright (C) 2015 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2020 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -23,7 +23,12 @@ def read_tlsmaster(filepath):
         if x:
             sid = x.group("sid").strip()
             key = x.group("key").strip()
-            ret[binascii.a2b_hex(sid)] = binascii.a2b_hex(key)
+            try:
+                # In case a malformed session or key is read. Handles the
+                # odd-length string error.
+                ret[binascii.a2b_hex(sid)] = binascii.a2b_hex(key)
+            except TypeError:
+                continue
     return ret
 
 class JA3(object):

@@ -45,7 +45,7 @@ class PcapReader(object):
         try:
             self.pcap = dpkt.pcap.Reader(fp_or_filepath)
         except ValueError as e:
-            if e.message == "invalid tcpdump header":
+            if str(e) == "invalid tcpdump header":
                 log.critical("Currently we don't support PCAP-NG files")
             self.pcap = None
 
