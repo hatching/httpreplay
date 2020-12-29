@@ -75,7 +75,7 @@ def decode_gzip(ts, content):
     try:
         return zlib.decompress(content, 16 + zlib.MAX_WBITS)
     except zlib.error as e:
-        if "incomplete or truncated stream" in e.message:
+        if "incomplete or truncated stream" in str(e):
             log.warning(
                 "Error unpacking GZIP stream in HTTP response, it is quite "
                 "likely that something went wrong during the process of "
@@ -210,9 +210,9 @@ class HttpProtocol(Protocol):
         # Return dummy object.
         return _Response(recv)
 
-    def handle(self, s, ts, protocol, sent, recv):
+    def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
         if protocol != "tcp" and protocol != "tls":
-            self.parent.handle(s, ts, protocol, sent, recv)
+            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
             return
 
         req = None
@@ -229,21 +229,22 @@ class HttpProtocol(Protocol):
             res = self.parse_response(ts, recv)
 
             # Report this stream as being a valid HTTP stream.
-            self.parent.handle(s, ts, protocols[protocol], req, res)
+            self.parent.handle(s, ts, protocols[protocol], req, res, tlsinfo)
         else:
 
             # This wasn't a valid HTTP stream so we forward the original TCP
             # or TLS stream straight ahead to our parent.
-            self.parent.handle(s, ts, protocol, bytes_to_str(sent), bytes_to_str(recv))
+            self.parent.handle(s, ts, protocol, bytes_to_str(sent), bytes_to_str(recv), tlsinfo)
 
 class HttpsProtocol(HttpProtocol):
     """HTTPS handler interprets HTTP only upon successful TLS decryption."""
 
-    def handle(self, s, ts, protocol, sent, recv):
+    def handle(self, s, ts, protocol, sent, recv , tlsinfo=None):
         if protocol != "tls":
-            return self.parent.handle(s, ts, protocol, sent, recv)
+            print("Type: %s" % self.parent)
+            return self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
 
-        super(HttpsProtocol, self).handle(s, ts, protocol, sent, recv)
+        super(HttpsProtocol, self).handle(s, ts, protocol, sent, recv, tlsinfo)
 
 class SmtpProtocol(Protocol):
     """Interprets the SMTP protocol."""
@@ -291,10 +292,10 @@ class SmtpProtocol(Protocol):
             354: self.handle_mailbody,
         }
 
-    def handle(self, s, ts, protocol, sent, recv):
+    def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
 
         if protocol != "tcp":
-            self.parent.handle(s, ts, protocol, sent, recv)
+            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
             return
 
         if self.stream is None:
@@ -303,7 +304,7 @@ class SmtpProtocol(Protocol):
         self.parse_reply(recv.decode("utf-8"))
 
         if self.stream.state in ["conn_finish", "conn_closed"]:
-            self.parent.handle(s, ts, "smtp", self.request, self.reply)
+            self.parent.handle(s, ts, "smtp", self.request, self.reply, tlsinfo)
 
     def handle_hostname(self, data):
         if len(data) > 1:

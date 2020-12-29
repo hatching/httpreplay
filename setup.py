@@ -13,11 +13,12 @@ setup(
     packages=[
         "httpreplay",
     ],
+    url="https://github.com/hatching/httpreplay",
     license="GPLv3",
     description="Properly interpret, decrypt, and replay pcap files",
     install_requires=[
         "dpkt==1.9.2",
-        "tlslite-ng==0.7.5",
+        "tlslite-ng==0.7.6",
         "click>=6.7, <7",
         "brotli==1.0.7",
         "future",

@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2018 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2020 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -8,15 +8,31 @@ import socket
 import tlslite
 import binascii
 
-from httpreplay.exceptions import (
-    UnknownTcpSequenceNumber, UnexpectedTcpData, InvalidTcpPacketOrder,
-)
+from httpreplay.exceptions import (UnknownTcpSequenceNumber, UnexpectedTcpData, InvalidTcpPacketOrder)
+from httpreplay.misc import JA3, patch_dpkt_ssl_tlshello_unpacks
 from httpreplay.shoddy import Protocol
+
+# Patch dpkt v1.8.7 to support reading TLShello extensions. See method
+# description for further info.
+patch_dpkt_ssl_tlshello_unpacks()
 
 log = logging.getLogger(__name__)
 
 class Packet(bytes):
     ts = None
+
+class TLSInfo(object):
+    def __init__(self, JA3, JA3S, JA3_params, JA3S_params, client_hello,
+                 server_hello):
+        self.JA3 = JA3
+        self.JA3S = JA3S
+        self.JA3_params = JA3_params
+        self.JA3S_params = JA3S_params
+        self.client_hello = client_hello
+        self.server_hello = server_hello
+
+    def __repr__(self):
+        return "<JA3=%s, JA3S=%s>" % (self.JA3, self.JA3S)
 
 class TCPPacketStreamer(Protocol):
     """Translates TCP/IP packet streams into rich streams of stitched
@@ -280,9 +296,7 @@ class TCPStream(Protocol):
             return
 
         if tcp.data and to_server and self.recv:
-            self.parent.handle(
-                self.s, self.ts, "tcp", b"".join(self.sent), b"".join(self.recv)
-            )
+            self.parent.handle(self.s, self.ts, "tcp", b"".join(self.sent), b"".join(self.recv), None)
             self.sent, self.recv = [], []
             self.ts = None
 
@@ -428,12 +442,22 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
         except tlslite.errors.TLSBadRecordMAC:
             log.warning("Bad MAC record, cannot decrypt server stream.")
             return ""
+        except tlslite.errors.TLSDecryptionFailed:
+            log.warning(
+                "Invalid data length. Data modulo blocklength was not 0"
+            )
+            return ""
 
     def decrypt_client(self, record_type, buf):
         try:
             return self.decrypt(self.client_state, record_type, buf)
         except tlslite.errors.TLSBadRecordMAC:
             log.warning("Bad MAC record, cannot decrypt client stream.")
+            return ""
+        except tlslite.errors.TLSDecryptionFailed:
+            log.warning(
+                "Invalid data length. Data modulo blocklength was not 0"
+            )
             return ""
 
 class TLSStream(Protocol):
@@ -571,7 +595,23 @@ class TLSStream(Protocol):
             if not isinstance(recv[0], bytes):
                 recv = [ord(c) if len(c) != 0 else b"" for c in recv]
 
-            self.parent.handle(s, ts, "tls", b"".join(sent), b"".join(recv))
+            ja3, ja3s, ja3_p, ja3s_p = None, None, None, None
+            try:
+                ja3, ja3_p = JA3.JA3(self.client_hello.data)
+            except ValueError as e:
+                log.warning("Failed to calculate JA3: %s", e)
+
+            try:
+                ja3s, ja3s_p = JA3.JA3S(self.server_hello.data)
+            except ValueError as e:
+                log.warning("Failed to calculate JA3S: %s", e)
+
+            tlsinfo = TLSInfo(
+                JA3=ja3, JA3S=ja3s, JA3_params=ja3_p, JA3S_params=ja3s_p,
+                client_hello=self.client_hello, server_hello=self.server_hello
+            )
+
+            self.parent.handle(s, ts, "tls", b"".join(sent), b"".join(recv), tlsinfo)
             return True
 
     def state_done(self, s, ts):
@@ -590,9 +630,9 @@ class TLSStream(Protocol):
         "done": state_done,
     }
 
-    def handle(self, s, ts, protocol, sent, recv):
+    def handle(self, s, ts, protocol, sent, recv, tlsinfo=None):
         if protocol != "tcp":
-            self.parent.handle(s, ts, protocol, sent, recv)
+            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
             return
 
         try:
