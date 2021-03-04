@@ -1,4 +1,4 @@
-# Copyright (C) 2015-2020 Jurriaan Bremer <jbr@cuckoo.sh>
+# Copyright (C) 2015-2021 Jurriaan Bremer <jbr@cuckoo.sh>
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
@@ -9,8 +9,31 @@ import dpkt
 
 from .abstracts import Protocol
 
-_DNSQuery = namedtuple("DNSQuery", ["type", "name"])
-_DNSResponse = namedtuple("DNSResponse", ["type", "data", "fields"])
+DNSQuery = namedtuple("DNSQuery", ["type", "name"])
+DNSResponse = namedtuple("DNSResponse", ["type", "data", "fields"])
+
+class DNSQueries:
+
+    __slots__ = ("queries", "rawsize")
+
+    def __init__(self, queries, raw):
+        self.queries = queries
+        self.rawsize = len(raw)
+
+    def __len__(self):
+        return self.rawsize
+
+class DNSResponses:
+
+    __slots__ = ("responses", "queries", "rawsize")
+
+    def __init__(self, responses, queries, raw):
+        self.responses = responses
+        self.queries = queries
+        self.rawsize = len(raw)
+
+    def __len__(self):
+        return self.rawsize
 
 _TYPE_MAP = {
     dpkt.dns.DNS_A: "A",
@@ -39,23 +62,10 @@ def _get_ip(data):
 
 class DNS(Protocol):
 
-    def handle(self, s, ts, protocol, sent, recv=None, tlsinfo=None):
-        if protocol != "udp":
-            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
-            return
-
-        try:
-            dns = dpkt.dns.DNS(sent)
-        except dpkt.UnpackError:
-            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
-            return
-
-        # For now, only process query response. Later expand to keep track
-        # of the actual query and response and yield when we have both of them
-        if dns.qr != dpkt.dns.DNS_R:
-            return
+    def _make_dns_response(self, dns, rawdata):
         if dns.opcode != dpkt.dns.DNS_QUERY:
             return
+
         if dns.rcode != dpkt.dns.DNS_RCODE_NOERR:
             return
 
@@ -69,7 +79,7 @@ class DNS(Protocol):
 
         queries = []
         for entry in dns.qd:
-            queries.append(_DNSQuery(
+            queries.append(DNSQuery(
                 type=_TYPE_MAP.get(entry.type, "Unknown"), name=entry.name
             ))
 
@@ -110,9 +120,52 @@ class DNS(Protocol):
                     "port": ans.port
                 }
 
-            answers.append(_DNSResponse(
+            answers.append(DNSResponse(
                 type=_TYPE_MAP.get(ans.type, "Unknown"), data=data,
                 fields=fields
             ))
 
-        self.parent.handle(s, ts, "dns", queries, answers, tlsinfo)
+        return DNSResponses(
+            responses=answers, queries=queries, raw=rawdata
+        )
+
+    def _make_dns_query(self, dns, rawdata):
+        if dns.opcode != dpkt.dns.DNS_QUERY:
+            return
+        if dns.rcode != dpkt.dns.DNS_RCODE_NOERR:
+            return
+
+        # No DNS queries in the DNS response
+        if not dns.qd:
+            return
+
+        queries = []
+        for entry in dns.qd:
+            queries.append(DNSQuery(
+                type=_TYPE_MAP.get(entry.type, "Unknown"), name=entry.name
+            ))
+
+        return DNSQueries(queries=queries, raw=rawdata)
+
+    def handle(self, s, ts, protocol, sent, recv=None, tlsinfo=None):
+        if protocol != "udp":
+            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
+            return
+
+        try:
+            dns = dpkt.dns.DNS(sent)
+        except dpkt.UnpackError:
+            self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
+            return
+
+        # For now, only process query response. Later expand to keep track
+        # of the actual query and response and yield when we have both of them
+        if dns.qr == dpkt.dns.DNS_R:
+            responses = self._make_dns_response(dns, sent)
+            if responses:
+                self.parent.handle(s, ts, "dns", responses, None, tlsinfo)
+
+        elif dns.qr == dpkt.dns.DNS_Q:
+            queries = self._make_dns_query(dns, sent)
+            if queries:
+                self.parent.handle(s, ts, "dns", queries, None, tlsinfo)

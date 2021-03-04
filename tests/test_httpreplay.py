@@ -483,7 +483,6 @@ class TestTLSInfoJA3(PcapTest):
     }
 
     def format(self, s, ts, p, sent, recv, tlsinfo):
-        print(tlsinfo.JA3, tlsinfo.JA3_params, tlsinfo.JA3S, tlsinfo.JA3S_params)
         return tlsinfo.JA3, tlsinfo.JA3_params, tlsinfo.JA3S, tlsinfo.JA3S_params
 
     expected_output = [

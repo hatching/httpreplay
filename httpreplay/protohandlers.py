@@ -2,10 +2,10 @@
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
-import httpreplay.protoparsers
-from httpreplay.protoparsers import bytes_to_str
-import httpreplay.reader
 import httpreplay.abstracts
+import httpreplay.protoparsers
+import httpreplay.udpprotoparsers
+import httpreplay.reader
 import httpreplay.transport
 
 class ForwardProtocol(httpreplay.abstracts.Protocol):
@@ -36,3 +36,6 @@ def tls_handler(tlsmaster={}):
 
 def smtp_handler():
     return httpreplay.protoparsers.SmtpProtocol()
+
+def DNS():
+    return httpreplay.udpprotoparsers.DNS()

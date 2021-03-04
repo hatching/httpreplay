@@ -306,8 +306,10 @@ class SmtpProtocol(Protocol):
 
         if self.stream is None:
             self.stream = self.parent.tcp.streams[s]
-        self.parse_request(sent.decode("utf-8"))
-        self.parse_reply(recv.decode("utf-8"))
+
+        # TODO improve this. Currently data is lost on decoding errors.
+        self.parse_request(sent.decode(errors="ignore"))
+        self.parse_reply(recv.decode(errors="ignore"))
 
         if self.stream.state in ["conn_finish", "conn_closed"]:
             self.parent.handle(
