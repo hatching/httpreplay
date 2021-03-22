@@ -3,6 +3,7 @@
 # See the file 'LICENSE' for copying permission.
 
 from past.builtins import basestring
+from pathlib import Path
 import dpkt
 import logging
 import socket
@@ -39,7 +40,7 @@ class PcapReader(object):
         self.exceptions = {}
 
         # Backwards compatibilty with httpreplay<=0.1.14.
-        if isinstance(fp_or_filepath, basestring):
+        if isinstance(fp_or_filepath, (basestring, Path)):
             fp_or_filepath = open(fp_or_filepath, "rb")
 
         try:
