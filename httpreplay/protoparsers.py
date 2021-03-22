@@ -488,8 +488,14 @@ class SmtpRequest(object):
         self.headers = {}
         self.raw = []
 
+    def __len__(self):
+        return len(self.raw)
+
 class SmtpReply(object):
     def __init__(self):
         self.ready_message = None
         self.ok_responses = []
         self.raw = []
+
+    def __len__(self):
+        return len(self.raw)
