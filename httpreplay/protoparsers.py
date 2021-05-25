@@ -143,6 +143,9 @@ class _Request(object):
     def __str__(self):
         return self.raw
 
+    def __len__(self):
+        return len(self.raw)
+
 class _Response(object):
     """Dummy HTTP response object which only has the raw paremeter set."""
 
@@ -152,6 +155,9 @@ class _Response(object):
 
     def __str__(self):
         return self.raw
+
+    def __len__(self):
+        return len(self.raw)
 
 
 class HttpProtocol(Protocol):
