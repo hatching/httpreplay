@@ -136,7 +136,7 @@ class TCPPacketStreamer(Protocol):
             s = self.streams[sr]
             to_server = False
         else:
-            log.warning("Unknown stream %s:%s -> %s:%s!", *sn)
+            log.warning("Unknown stream %f %s:%s -> %s:%s!", ts, *sn)
             return
 
         s.process(ts, tcp, to_server)
@@ -483,24 +483,24 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
             return self.decrypt(self.server_state, record_type, buf)
         except tlslite.errors.TLSBadRecordMAC:
             log.warning("Bad MAC record, cannot decrypt server stream.")
-            return ""
+            return b""
         except tlslite.errors.TLSDecryptionFailed:
             log.warning(
                 "Invalid data length. Data modulo blocklength was not 0"
             )
-            return ""
+            return b""
 
     def decrypt_client(self, record_type, buf):
         try:
             return self.decrypt(self.client_state, record_type, buf)
         except tlslite.errors.TLSBadRecordMAC:
             log.warning("Bad MAC record, cannot decrypt client stream.")
-            return ""
+            return b""
         except tlslite.errors.TLSDecryptionFailed:
             log.warning(
                 "Invalid data length. Data modulo blocklength was not 0"
             )
-            return ""
+            return b""
 
 class TLSStream(Protocol):
     """Decrypts TLS streams into a TCPStream-like session."""
@@ -550,15 +550,15 @@ class TLSStream(Protocol):
 
         # The master secret can be obtained through the session id or
         # a (client random, server random) tuple or the client random only.
-        if self.server_hello.data.session_id in self.secrets:
+        if (client_random, server_random) in self.secrets:
+            master_secret = self.secrets[client_random, server_random]
+            log.debug("Master Secret: (client_random, server_random) found")
+        elif self.server_hello.data.session_id in self.secrets:
             master_secret = self.secrets[self.server_hello.data.session_id]
             log.debug("Master Secret: Session id found")
         elif client_random in self.secrets:
             master_secret = self.secrets[client_random]
             log.debug("Master Secret: Client random found")
-        elif (client_random, server_random) in self.secrets:
-            master_secret = self.secrets[client_random, server_random]
-            log.debug("Master Secret: (client_random, server_random) found")
         else:
             log.info("Could not find TLS master secret for stream "
                      "%s:%d -> %s:%d, skipping it.", *s)
@@ -656,6 +656,7 @@ class TLSStream(Protocol):
             self.parent.handle(
                 s, ts, "tls", b"".join(sent), b"".join(recv), tlsinfo
             )
+
             return True
 
     def state_done(self, s, ts):

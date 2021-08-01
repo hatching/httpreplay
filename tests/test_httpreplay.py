@@ -75,7 +75,7 @@ class TestNoResponse(PcapTest):
     pcapfile = "2014-08-13-element1208_spm2.exe-sandbox-analysis.pcap"
 
     def format(self, s, ts, p, sent, recv):
-        return sent.method, sent.uri, recv.raw
+        return sent.method, sent.uri, recv
 
     expected_output = [
         ("POST", "/cmd.php", b""),

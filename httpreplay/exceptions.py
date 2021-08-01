@@ -25,3 +25,7 @@ class UnexpectedTcpData(ReplayException):
 
 class UnknownHttpEncoding(ReplayException):
     """Unknown HTTP content encoding."""
+
+class InvalidProtocol(ReplayException):
+    """Protocol cannot be parsed and should continue to its parent or another
+    protocol handler"""

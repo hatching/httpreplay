@@ -11,7 +11,7 @@ import brotli
 import re
 import base64
 
-from httpreplay.exceptions import UnknownHttpEncoding
+from httpreplay.exceptions import UnknownHttpEncoding, InvalidProtocol
 from httpreplay.abstracts import Protocol
 
 log = logging.getLogger(__name__)
@@ -169,12 +169,11 @@ class HttpProtocol(Protocol):
             res.raw = sent
             return res
         except dpkt.UnpackError as e:
-            if str(e).startswith("invalid http method"):
-                log.warning("This is not a HTTP request (timestamp %f).", ts)
-            elif str(e).startswith("invalid request"):
-                log.warning(
-                    "This is an invalid HTTP request (timestamp %f): %s",
-                    ts, e
+            if str(e).startswith(("invalid http method", "invalid request")):
+                # Do not return dummy request in this case. We want to prevent
+                # wrapping other protocols as http.
+                raise InvalidProtocol(
+                    f"Invalid HTTP request. timestamp={ts}, error={e}"
                 )
             else:
                 log.warning(
@@ -192,6 +191,10 @@ class HttpProtocol(Protocol):
             content_encoding = res.headers.get("content-encoding")
             if content_encoding and res.body:
                 if content_encoding not in content_encodings:
+                    log.warning(
+                        "Unsupported http content encoding: %r",
+                        content_encoding
+                    )
                     raise UnknownHttpEncoding(content_encoding)
 
                 res.body = content_encodings[content_encoding](ts, res.body)
@@ -213,9 +216,10 @@ class HttpProtocol(Protocol):
                     "there doesn't appear to be one (timestamp %f).", ts
                 )
             elif str(e).startswith("invalid response"):
-                log.warning(
-                    "This is an invalid HTTP response (timestamp %f): %s",
-                    ts, e
+                # Do not return dummy response in this case. We want to prevent
+                # wrapping other protocols as http.
+                raise InvalidProtocol(
+                    f"Invalid HTTP response. timestamp={ts}, error={e}"
                 )
 
         # Return dummy object.
@@ -228,26 +232,47 @@ class HttpProtocol(Protocol):
 
         req = None
         if sent:
-            req = self.parse_request(ts, sent)
+            try:
+                req = self.parse_request(ts, sent)
+            except InvalidProtocol as e:
+                log.warning(
+                    "Falling back to parent handler. Invalid protocol."
+                    " %s: %s", s, e
+                )
+                self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
+                return
 
         protocols = {
             "tcp": "http",
             "tls": "https",
         }
 
-        # Only try to decode the HTTP response if the request was valid HTTP.
-        if req != None and not isinstance(req,_Request):
-            res = self.parse_response(ts, recv)
+        if not recv:
+            # Nothing received, but a correct request
+            if req is not None:
+                return self.parent.handle(
+                    s, ts, protocols[protocol], req, recv, tlsinfo
+                )
+            # Nothing received and not correct request
+            else:
+                return self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
 
-            # Report this stream as being a valid HTTP stream.
-            self.parent.handle(s, ts, protocols[protocol], req, res, tlsinfo)
-        else:
-
-            # This wasn't a valid HTTP stream so we forward the original TCP
-            # or TLS stream straight ahead to our parent.
+        try:
             self.parent.handle(
-                s, ts, protocol, sent, recv,
+                s, ts, protocols[protocol], req, self.parse_response(ts, recv),
                 tlsinfo
+            )
+        except InvalidProtocol as e:
+            log.warning(
+                "Falling back to parent handler. Invalid protocol."
+                " %s: %s", s, e
+            )
+            # We do propagate the decoded http request. It is possible
+            # that the server did not support http, closed the connection,
+            # etc. This does not mean the request is not valid http.
+            # TODO support different protocol labels for sent and recv.
+            self.parent.handle(
+                s, ts, protocols[protocol], req, recv, tlsinfo
             )
 
 class HttpsProtocol(HttpProtocol):
