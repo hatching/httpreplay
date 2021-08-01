@@ -73,7 +73,7 @@ class JA3(object):
     @staticmethod
     def _handle_server_hello(handshake):
         ja3 = [str(handshake.version)]
-        ja3.append(str(handshake.cipher_suite))
+        ja3.append(str(handshake.cipher_suite.code))
         ja3 += JA3._process_extensions_server(handshake)
         return ja3
 

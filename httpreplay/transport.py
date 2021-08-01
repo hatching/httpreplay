@@ -569,7 +569,7 @@ class TLSStream(Protocol):
         # supported, in that case we can't decrypt this TLS stream.
         cipher_success = self.tls.init_cipher(
             self.client_hello.data.version,
-            self.server_hello.data.cipher_suite,
+            self.server_hello.data.cipher_suite.code,
             master_secret, client_random, server_random,
             tlslite.handshakesettings.CIPHER_IMPLEMENTATIONS
         )
