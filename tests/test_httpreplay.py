@@ -12,6 +12,7 @@ import pytest
 import tempfile
 import binascii
 
+from httpreplay.guess import tcp_guessprotocol
 from httpreplay.protoparsers import parse_body, HttpProtocol
 from httpreplay.main import do_pcap2mitm
 from httpreplay.misc import read_tlsmaster
@@ -38,7 +39,7 @@ class PcapTest(object):
     def format(self, s, ts, p, sent, recv):
         raise NotImplementedError
 
-    def test_pcap(self):
+    def _make_output(self):
         with open(os.path.join("tests", "pcaps", self.pcapfile), "rb") as f:
             reader = PcapReader(f)
             reader.tcp = TCPPacketStreamer(reader, self.handlers)
@@ -46,10 +47,10 @@ class PcapTest(object):
 
             reader.raise_exceptions = self.use_exceptions
 
-            output = [
-                self.format(*stream) for stream in reader.process()
-            ]
+            return [self.format(*stream) for stream in reader.process()]
 
+    def test_pcap(self):
+        output = self._make_output()
         assert len(self.expected_output) == len(output) and sorted(self.expected_output,key=lambda x: "" if x is None else str(x)) == sorted(output,key=lambda x: "" if x is None else str(x))
 
 class TestSimple(PcapTest):
@@ -490,3 +491,41 @@ class TestTLSInfoJA3(PcapTest):
          "769,47-53-5-10-49171-49172-49161-49162-50-56-19-4,65281-0-5-10-11,23-24,0",
          "d2e6f7ef558ea8036c7e21b163b2d1af", "769,5,0-65281")
     ]
+
+class TestProtocolGuesser(PcapTest):
+    pcapfile = "2019-05-01-airfrance-fr-traffic.pcap"
+
+    handlers = {
+        "generic": lambda: tcp_guessprotocol(
+            read_tlsmaster(
+                "tests/tlsmasters/2019-05-01-airfrance-fr-tlsmaster.mitm"
+            )
+        )
+    }
+
+    https_uris = [
+        "https /FR/common/common/img/hopCard/common/top_right_border.png",
+        "https /FR/fr/local/json/tbaf/destinations/iatas.json",
+        "https /log",
+    ]
+
+    http_uris = [
+        "http /edgedl/release2/update2/ANrcqf-u-0tl_1.3.34.7/GoogleUpdateSetup.exe?cms_redirect=yes&mip=5.48.205.29&mm=28&mn=sn-cv0tb0xn-uanl&ms=nvh&mt=1555914529&mv=u&pl=18&shardbypass=yes",
+        "http /ncsi.txt",
+    ]
+
+    def format(self, s, ts, p, sent, recv):
+        return f"{p} {sent.uri}"
+
+    def test_tls_http(self):
+        output = self._make_output()
+        for proto_uri in self.https_uris:
+            assert proto_uri in output
+
+    def test_http(self):
+        output = self._make_output()
+        for proto_uri in self.http_uris:
+            assert proto_uri in output
+
+    def test_pcap(self):
+        pass

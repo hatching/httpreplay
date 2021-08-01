@@ -13,6 +13,7 @@ from httpreplay.exceptions import (
 from httpreplay.abstracts import Protocol
 from httpreplay.misc import JA3
 
+
 log = logging.getLogger(__name__)
 
 class Packet(bytes):
@@ -481,8 +482,8 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
     def decrypt_server(self, record_type, buf):
         try:
             return self.decrypt(self.server_state, record_type, buf)
-        except tlslite.errors.TLSBadRecordMAC:
-            log.warning("Bad MAC record, cannot decrypt server stream.")
+        except tlslite.errors.TLSBadRecordMAC as e:
+            log.warning("Bad MAC record, cannot decrypt server stream. %s", e)
             return b""
         except tlslite.errors.TLSDecryptionFailed:
             log.warning(
@@ -493,8 +494,8 @@ class _TLSStream(tlslite.tlsrecordlayer.TLSRecordLayer):
     def decrypt_client(self, record_type, buf):
         try:
             return self.decrypt(self.client_state, record_type, buf)
-        except tlslite.errors.TLSBadRecordMAC:
-            log.warning("Bad MAC record, cannot decrypt client stream.")
+        except tlslite.errors.TLSBadRecordMAC as e:
+            log.warning("Bad MAC record, cannot decrypt client stream. %s", e)
             return b""
         except tlslite.errors.TLSDecryptionFailed:
             log.warning(
