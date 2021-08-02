@@ -3,7 +3,7 @@
 # See the file 'LICENSE' for copying permission.
 
 from httpreplay.abstracts import Protocol
-from httpreplay.protohandlers import http_handler, tls_handler
+from httpreplay.protohandlers import http_handler, tls_handler, smtp_handler
 
 http1_keywords = (
     b"GET /", b"POST /", b"HEAD /", b"PUT /", b"DELETE /", b"CONNECT /",
@@ -35,12 +35,24 @@ def _guess_tls(sent, recv, tlskeys, parent):
                 tlshandler.parent = guesser
                 return tlshandler
 
+def _guess_smtp(sent, recv, tlskeys, parent):
+    if recv and len(recv) > 1:
+        if recv.startswith(b"220 ") and b" ESMTP" in recv or b" SMTP" in recv:
+            smtp = smtp_handler()
+            smtp.parent = parent
+            return smtp
+
+    if sent and len(sent) >= 5:
+        if sent[:5].lower() in (b"ehlo ", b"helo "):
+            smtp = smtp_handler()
+            smtp.parent = parent
+            return smtp
 
 class TCPGuessProtocol(Protocol):
 
     # A guesser must return an initalized protocol handler with the guessers
     # parent set in its parent chain.
-    _protocol_guessers = (_guess_http, _guess_tls)
+    _protocol_guessers = (_guess_http, _guess_tls, _guess_smtp)
 
     def init(self, secrets={}):
         self.guessed_proto = None

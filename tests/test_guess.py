@@ -2,10 +2,11 @@
 # This file is part of HTTPReplay - http://jbremer.org/httpreplay/
 # See the file 'LICENSE' for copying permission.
 
-from httpreplay.reader import PcapReader
-from httpreplay.transport import TCPPacketStreamer
 from httpreplay.guess import tcp_guessprotocol
 from httpreplay.misc import read_tlsmaster
+from httpreplay.protoparsers import SmtpReply, SmtpRequest
+from httpreplay.reader import PcapReader
+from httpreplay.transport import TCPPacketStreamer
 
 class GuessTest:
 
@@ -78,3 +79,17 @@ class TestGuessTLSHTTP(GuessTest):
         output = self._make_output()
         for proto_uri in self.http_uris:
             assert proto_uri in output
+
+class TestSMTPGuesser(GuessTest):
+
+    pcap = "tests/pcaps/smtp-auth-login.pcap"
+
+    def format(self, s, ts, p, sent, recv):
+        return sent, recv
+
+    def test_pcap(self):
+        sent, recv = self._make_output()[0]
+        assert isinstance(sent, SmtpRequest)
+        assert isinstance(recv, SmtpReply)
+        assert recv.ready_message == "220 smtp006.mail.xxx.xxxxx.com ESMTP\r\n"
+        assert sent.hostname == "Percival"
