@@ -334,6 +334,10 @@ class TCPStream(Protocol):
         if not tcp.data:
             return
 
+        # We already have data in the recv buffer and now detect new data or
+        # a request being sent to the server. See the current sent and recv
+        # data as a request and answer and hand it over to the parent protocol
+        # handler. Then start reassembling a new conversation.
         if tcp.data and to_server and self.recv:
             self.parent.handle(
                 self.s, self.ts, "tcp", b"".join(self.sent),
