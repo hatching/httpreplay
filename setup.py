@@ -21,7 +21,7 @@ setup(
         "tlslite-ng==0.7.6",
         "click>=7.0.0, <7.2",
         "brotli==1.0.9, <1.1",
-        "future",
+        "future"
     ],
     extras_require={
         "mitmproxy": [
