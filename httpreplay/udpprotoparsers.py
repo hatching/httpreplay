@@ -154,7 +154,7 @@ class DNS(Protocol):
 
         try:
             dns = dpkt.dns.DNS(sent)
-        except dpkt.UnpackError:
+        except (dpkt.UnpackError, UnicodeDecodeError):
             self.parent.handle(s, ts, protocol, sent, recv, tlsinfo)
             return
 
