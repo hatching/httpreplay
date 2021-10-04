@@ -534,6 +534,23 @@ class TLSStream(Protocol):
         self.client_hello = self.parse_record(self.sent.pop(0))
         self.server_hello = self.parse_record(self.recv.pop(0))
 
+        # Ignore TLS stream that does not start out with handshake. Can occur
+        # on TCP retransmission being incorrectly assembled and the handshake
+        # being lost.
+        if not isinstance(self.client_hello, dpkt.ssl.TLSHandshake):
+            log.debug(
+                "Stream %s:%d -> %s:%d is not TLS handshake. Skipping it.", *s
+            )
+            self.state = "done"
+            return
+
+        if not isinstance(self.server_hello, dpkt.ssl.TLSHandshake):
+            log.debug(
+                "Stream %s:%d -> %s:%d is not TLS handshake. Skipping it.", *s
+            )
+            self.state = "done"
+            return
+
         if not isinstance(self.client_hello.data, dpkt.ssl.TLSClientHello):
             log.info(
                 "Stream %s:%d -> %s:%d doesn't appear to be a proper TLS "
