@@ -7,7 +7,7 @@ from setuptools import setup
 
 setup(
     name="HTTPReplay",
-    version="0.3",
+    version="0.4",
     author="Hatching B.V.",
     author_email="info@hatching.io",
     packages=[
@@ -23,6 +23,7 @@ setup(
         "brotli==1.0.9, <1.1",
         "future"
     ],
+    python_requires=">=3.6",
     extras_require={
         "mitmproxy": [
             "mitmproxy==4.0.4",
