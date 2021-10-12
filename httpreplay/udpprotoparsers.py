@@ -100,7 +100,7 @@ class DNS(Protocol):
             elif ans.type == dpkt.dns.DNS_MX:
                 data = ans.mxname
                 fields = {
-                    "preference": ans.preference
+                    "preference": ans.preference[0]
                 }
             elif ans.type == dpkt.dns.DNS_SOA:
                 data = ans.mname
