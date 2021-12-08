@@ -7,7 +7,7 @@ from setuptools import setup
 
 setup(
     name="HTTPReplay",
-    version="0.4",
+    version="1.0",
     author="Hatching B.V.",
     author_email="info@hatching.io",
     packages=[
